@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head(${vm.title()} + ' — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div class="header-row">
+        <h1 class="logo"><a href="/">ekran</a></h1>
+        <th:block th:replace="~{searchbar :: searchbar(false)}"></th:block>
+    </div>
+    <article class="movie">
+        <header class="movie-head">
+            <img class="poster" th:if="${vm.posterUrl() != null}" th:src="${vm.posterUrl()}" alt="">
+            <div class="movie-info">
+                <h2 th:text="${vm.title()}">Title</h2>
+                <p class="original-title" th:if="${vm.originalTitle() != null}" th:text="${vm.originalTitle()}">Original title</p>
+                <p class="meta-line">
+                    <span th:if="${vm.year() != null}" th:text="${vm.year()}">1979</span>
+                    <span th:if="${vm.runtime() != null}" th:text="${vm.runtime()}">1h 52m</span>
+                    <span th:if="${vm.rating() != null}" th:text="${vm.rating()}">7.8 ★</span>
+                    <span th:if="${vm.genres() != null}" th:text="${vm.genres()}">Genres</span>
+                </p>
+                <p class="external-links">
+                    <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">View on TMDB ↗</a>
+                </p>
+            </div>
+        </header>
+        <p class="overview" th:if="${vm.overview() != null}" th:text="${vm.overview()}">Overview</p>
+        <section class="credits">
+            <div th:if="${!vm.directors().isEmpty()}">
+                <h3 th:text="${#lists.size(vm.directors()) > 1} ? 'Directors' : 'Director'">Director</h3>
+                <ul class="crew">
+                    <li th:each="p : ${vm.directors()}">
+                        <a th:href="${p.href()}" th:text="${p.name()}">Name</a>
+                    </li>
+                </ul>
+            </div>
+            <div th:if="${!vm.writers().isEmpty()}">
+                <h3 th:text="${#lists.size(vm.writers()) > 1} ? 'Writers' : 'Writer'">Writer</h3>
+                <ul class="crew">
+                    <li th:each="p : ${vm.writers()}">
+                        <a th:href="${p.href()}" th:text="${p.name()}">Name</a>
+                        <span class="role" th:if="${p.role() != null}" th:text="${p.role()}">Screenplay</span>
+                    </li>
+                </ul>
+            </div>
+            <div th:if="${!vm.cast().isEmpty()}">
+                <h3>Cast</h3>
+                <ul class="crew">
+                    <li th:each="p : ${vm.cast()}">
+                        <a th:href="${p.href()}" th:text="${p.name()}">Name</a>
+                        <span class="role" th:if="${p.role() != null}" th:text="${p.role()}">Character</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </article>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

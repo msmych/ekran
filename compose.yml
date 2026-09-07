@@ -1,0 +1,46 @@
+services:
+  app:
+    # Immutable tag supplied at deploy time, e.g. ghcr.io/<owner>/ekran:<commit-sha>.
+    # Set via APP_IMAGE environment variable (see .github/workflows/deploy.yml).
+    image: ${APP_IMAGE:?APP_IMAGE must be set, e.g. ghcr.io/owner/ekran:<commit-sha>}
+    restart: unless-stopped
+    # Secrets and environment-specific config live in the untracked .env file on the server.
+    # Optional here — the app itself fails fast at startup if TMDB_API_TOKEN is missing.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 8080
+    # Loopback only, for host-side health checks; nginx reaches the app over the compose network.
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

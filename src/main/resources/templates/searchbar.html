@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="searchbar(live)">
+    <div th:class="${live} ? 'home-search' : 'site-search'">
+        <input type="search"
+               id="search-input"
+               name="q"
+               placeholder="Search movies…"
+               th:value="${q}"
+               autocomplete="off"
+               spellcheck="false"
+               hx-get="/search"
+               hx-trigger="input changed delay:100ms, search"
+               hx-sync="this: replace"
+               hx-indicator="#search-indicator"
+               th:attr="hx-target=${live} ? '#results' : '#search-overlay',
+                        autofocus=${live} ? 'autofocus' : null">
+        <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
+        <div id="search-overlay" class="search-overlay" th:if="${!live}"></div>
+    </div>
+</th:block>
+</body>
+</html>

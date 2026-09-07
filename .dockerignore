@@ -1,0 +1,16 @@
+.git
+.github
+.gradle
+build
+out
+.idea
+*.iml
+.DS_Store
+docs
+nginx
+certbot
+compose.yml
+compose.dev.yml
+quick_movie_search_agent_brief.docx
+quick_movie_search_deployment_strategy.md
+README.md
