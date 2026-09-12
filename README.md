@@ -80,15 +80,16 @@ non-root user, built-in `HEALTHCHECK` on `/health`, pinned base versions.
   automatic rollback to the previously deployed tag on failure.
 
 **Server-side setup (once):**
-1. VPS with Docker + Compose; firewall: 22/80/443 only; non-root deploy user (SSH keys).
-2. Config-only checkout of this repo at `/opt/ekran` (no JDK/Gradle needed — the server never builds).
-3. `/opt/ekran/.env` with `TMDB_API_TOKEN` (never committed; add it to `.gitignore` conventions).
-4. DNS for the domain → VPS IP; edit `nginx/conf.d/ekran.conf` (replace `movies.example.com`);
+1. VPS with Docker + Compose + git; firewall: 22/80/443 only; non-root deploy user in the `docker` group (SSH keys).
+2. `~/ekran/.env` with `TMDB_API_TOKEN` (never committed) — the deploy fails fast with a clear message until it exists.
+   The config-only checkout itself (`~/ekran`) is bootstrapped automatically on the first deploy
+   (no JDK/Gradle needed — the server never builds; if the repo is private, clone it manually).
+3. DNS for the domain → VPS IP; edit `nginx/conf.d/ekran.conf` (replace `movies.example.com`);
    issue certs with certbot into `./certbot/conf` (`docker run --rm -v ./certbot/conf:/etc/letsencrypt ... certonly`).
-5. Required repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`.
+4. Required repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`.
 
 **Rollback:** `.deployed-image` on the server keeps the current tag; deploys restore it on health-check
-failure, or manually: `APP_IMAGE=ghcr.io/<owner>/ekran:<sha> docker compose up -d app`.
+failure, or manually: `APP_IMAGE=ghcr.io/<owner>/ekran:<sha> docker compose up -d app` (from `~/ekran`).
 
 When PostgreSQL lands (step 2), it joins as a third compose service on the internal network only —
 the repository boundary makes that an additive change.

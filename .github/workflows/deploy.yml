@@ -48,7 +48,23 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd /opt/ekran
+
+            command -v git >/dev/null || { echo "ERROR: git is not installed on this host" >&2; exit 1; }
+            command -v docker >/dev/null || { echo "ERROR: docker is not installed on this host" >&2; exit 1; }
+
+            # config-only checkout in the deploy user's home; first deploy bootstraps it,
+            # later deploys pull config updates
+            EKRAN_DIR="$HOME/ekran"
+            if [ ! -d "$EKRAN_DIR/.git" ]; then
+              git clone "https://github.com/${{ github.repository }}.git" "$EKRAN_DIR" \
+                || { echo "ERROR: clone failed — if the repo is private, clone it manually to $EKRAN_DIR" >&2; exit 1; }
+            fi
+            cd "$EKRAN_DIR"
+
+            if [ ! -f .env ]; then
+              echo "ERROR: create $EKRAN_DIR/.env with TMDB_API_TOKEN once on this host" >&2
+              exit 1
+            fi
 
             # keep the currently deployed tag for rollback
             PREV_IMAGE=$(cat .deployed-image 2>/dev/null || true)
