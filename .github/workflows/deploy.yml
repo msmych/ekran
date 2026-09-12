@@ -52,12 +52,17 @@ jobs:
             command -v git >/dev/null || { echo "ERROR: git is not installed on this host" >&2; exit 1; }
             command -v docker >/dev/null || { echo "ERROR: docker is not installed on this host" >&2; exit 1; }
 
-            # config-only checkout in the deploy user's home; first deploy bootstraps it,
+            # config-only checkout in the deploy user's home; first deploy bootstraps it
+            # (init+fetch+checkout rather than clone — the dir may already hold the untracked .env),
             # later deploys pull config updates
             EKRAN_DIR="$HOME/ekran"
             if [ ! -d "$EKRAN_DIR/.git" ]; then
-              git clone "https://github.com/${{ github.repository }}.git" "$EKRAN_DIR" \
-                || { echo "ERROR: clone failed — if the repo is private, clone it manually to $EKRAN_DIR" >&2; exit 1; }
+              mkdir -p "$EKRAN_DIR"
+              git -C "$EKRAN_DIR" init -q
+              git -C "$EKRAN_DIR" remote add origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
+              git -C "$EKRAN_DIR" fetch -q origin main \
+                || { echo "ERROR: fetch failed — check network access to github.com from this host" >&2; exit 1; }
+              git -C "$EKRAN_DIR" checkout -q -B main origin/main
             fi
             cd "$EKRAN_DIR"
 
