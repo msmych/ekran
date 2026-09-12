@@ -86,7 +86,7 @@ non-root user, built-in `HEALTHCHECK` on `/health`, pinned base versions.
 2. `~/ekran/.env` with `TMDB_API_TOKEN` (never committed) — the deploy fails fast with a clear message until it exists.
    The config-only checkout itself (`~/ekran`) is bootstrapped automatically on the first deploy
    (no JDK/Gradle needed — the server never builds; if the repo is private, clone it manually).
-3. DNS for the domain → VPS IP; edit `nginx/conf.d/ekran.conf` (replace `movies.example.com`);
+3. DNS for the domain → VPS IP; edit `nginx/conf.d/ekran.conf`;
    issue certs with certbot into `./certbot/conf` (`docker run --rm -v ./certbot/conf:/etc/letsencrypt ... certonly`).
 4. Required repo secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`.
 
