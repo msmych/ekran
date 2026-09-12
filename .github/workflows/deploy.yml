@@ -71,6 +71,11 @@ jobs:
               exit 1
             fi
 
+            # GHCR packages are private by default — authenticate with the job token so the
+            # server can pull regardless of package visibility; token expires with the job
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
             # keep the currently deployed tag for rollback
             PREV_IMAGE=$(cat .deployed-image 2>/dev/null || true)
             NEW_IMAGE=${{ steps.image.outputs.name }}

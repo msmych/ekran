@@ -77,7 +77,9 @@ non-root user, built-in `HEALTHCHECK` on `/health`, pinned base versions.
 - `ci.yml` — PRs: build + full test suite + production image build + container smoke test. Never deploys.
 - `deploy.yml` — push to `main`: tests → image build → push to GHCR as `ghcr.io/<owner>/ekran:<commit-sha>`
   (immutable tags, never `:latest`) → SSH deploy to the VPS (`docker compose pull`/`up -d`) → health check →
-  automatic rollback to the previously deployed tag on failure.
+  automatic rollback to the previously deployed tag on failure. The server pulls from GHCR with the
+  job's `GITHUB_TOKEN` (logged in/out within the deploy) — the package can stay private; no manual
+  `docker login` on the VPS.
 
 **Server-side setup (once):**
 1. VPS with Docker + Compose + git; firewall: 22/80/443 only; non-root deploy user in the `docker` group (SSH keys).
