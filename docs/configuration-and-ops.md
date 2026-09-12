@@ -57,8 +57,6 @@ Packaging via the Gradle `application` plugin (`./gradlew installDist` / `build`
 
 ## Deployment (implemented, minus PostgreSQL)
 
-Per `quick_movie_search_deployment_strategy.md`:
-
 - Multi-stage `Dockerfile` (JDK 25 build → JRE 25 runtime, non-root, HEALTHCHECK on `/health`).
 - `compose.yml` — production: `app` (image from `APP_IMAGE`, loopback-only host port for health
   checks, JSON-file logs with rotation) + `nginx` (TLS via Let's Encrypt, HTTP→HTTPS redirect,

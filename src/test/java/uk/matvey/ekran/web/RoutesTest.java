@@ -104,15 +104,46 @@ class RoutesTest {
     @Test
     void searchHotkeysScriptLoadedOnEveryPage() {
         JavalinTest.test(app(), (server, http) -> {
-            for (var path : of("/", "/movies/348", "/persons/1", "/movies/999")) {
-                assertThat(http.get(path).body().string()).contains("src=\"/js/search.js\"");
+            for (var path : of("/", "/movies/348", "/persons/1", "/movies/999", "/about")) {
+                var body = http.get(path).body().string();
+                assertThat(body).contains("src=\"/js/search.js\"");
+                assertThat(body).contains("href=\"/about\"");
+                assertThat(body).contains("id=\"search-kbd\"");
             }
             var script = http.get("/js/search.js");
             assertThat(script.code()).isEqualTo(200);
             var js = script.body().string();
             assertThat(js).contains("code === 'Slash'");
             assertThat(js).contains("code === 'KeyK'");
-            assertThat(js).contains("input.blur()");
+            assertThat(js).contains("i.blur()");
+            assertThat(js).contains("ArrowDown");
+            assertThat(js).contains("'Ctrl K'");
+        });
+    }
+
+    @Test
+    void aboutPageRendersWithSearchBarAndAuthorLink() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/about");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("quickest movie search");
+            assertThat(body).contains("href=\"https://matvey.uk\"");
+            assertThat(body).contains("hx-target=\"#search-overlay\"");
+            assertThat(body).contains("not endorsed or certified by TMDB");
+        });
+    }
+
+    @Test
+    void faviconsLinkedInHead() {
+        JavalinTest.test(app(), (server, http) -> {
+            var body = http.get("/").body().string();
+            assertThat(body).contains("href=\"/favicons/favicon.ico\"");
+            assertThat(body).contains("href=\"/favicons/apple-touch-icon.png\"");
+            assertThat(body).contains("href=\"/favicons/site.webmanifest\"");
+            assertThat(http.get("/favicons/favicon.ico").code()).isEqualTo(200);
+            assertThat(http.get("/favicons/site.webmanifest").code()).isEqualTo(200);
         });
     }
 

@@ -105,7 +105,7 @@ Javalin with routes(services, thymeleaf)
 | JSON | Jackson (databind + jdk8/params-names as needed) | Required for TMDB responses |
 | Logging | SLF4J + Logback | Locked decision; simple console/file config, no ceremony |
 | Outbound HTTP | `java.net.http.HttpClient` | Zero extra dependency, supports connect timeout, connection reuse, and per-request timeouts |
-| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + one ~40-line first-party `search.js` (hotkeys, Escape, overlay close) | No blocking third-party assets; keyboard result nav deferred to a follow-up step |
+| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + one ~150-line first-party `search.js` (hotkeys, Escape, overlay close, keyboard result nav) | No blocking third-party assets; keyboard result nav deferred to a follow-up step |
 | Build | Gradle, `application` plugin | Locked decision |
 | Tests | JUnit 5, AssertJ, MockWebServer (OkHttp) or similar stub HTTP server | Mockable TMDB, no real API key |
 

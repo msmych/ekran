@@ -17,6 +17,7 @@
                th:attr="hx-target=${live} ? '#results' : '#search-overlay',
                         autofocus=${live} ? 'autofocus' : null">
         <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
+        <span class="search-kbd" id="search-kbd" aria-hidden="true">⌘K</span>
         <div id="search-overlay" class="search-overlay" th:if="${!live}"></div>
     </div>
 </th:block>

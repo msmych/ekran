@@ -11,6 +11,7 @@
 | `GET /persons/{tmdbId}/directing` | Director filmography | Full page |
 | `GET /persons/{tmdbId}/acting` | Acting filmography | Full page |
 | `GET /persons/{tmdbId}/writing` | Writing credits | Full page |
+| `GET /about` | About the app (author link, shortcuts list) | Full page |
 
 All pages are server-rendered by Thymeleaf. No client-side routing.
 
@@ -47,7 +48,7 @@ Compact row, in TMDB relevance order:
 
 Persons will join the result list in a follow-up step; the `SearchType` marker in the view model exists so that addition does not reshape `SearchResultsVm`.
 
-Keyboard result navigation is deliberately out of Step 1 scope (to be designed separately); native behavior applies (Tab through links, Enter fires an immediate HTMX search via the `search`-event trigger).
+Keyboard result navigation: `↓`/`↑` (or `Ctrl N`/`Ctrl P`) move a highlight through results while the search input has focus; `Enter` opens the highlighted result, and without a highlight it fires an immediate HTMX search via the `search`-event trigger. Handled in `search.js` — see `search-interaction.md`.
 
 ## `/movies/{tmdbId}` — movie detail
 
@@ -123,7 +124,8 @@ Served from `src/main/resources/static/`:
 
 - `/css/app.css` — single lightweight local stylesheet, no framework, basic system font stack. No design polish in Step 1.
 - `/js/htmx.min.js` — vendored HTMX (see `search-interaction.md` for version pinning).
-- `/js/search.js` — the only first-party JS (~40 lines: hotkeys, Escape, overlay close).
+- `/js/search.js` — the only first-party JS (~150 lines: hotkeys, Escape, overlay close, keyboard result navigation).
+- `/favicons/` — vendored favicon set (ico + PNG sizes + webmanifest); linked from the shared `head` fragment.
 - `/img/tmdb-logo.svg` — vendored TMDB logo for the attribution footer.
 
-No CDN references anywhere. App JS is minimal: vendored `htmx.min.js` plus one small first-party file, `/js/search.js` (~40 lines: `/` and Cmd/Ctrl+K hotkeys, Escape semantics, click-away overlay close). Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.
+No CDN references anywhere. App JS is minimal: vendored `htmx.min.js` plus one small first-party file, `/js/search.js` (~150 lines: hotkeys, Escape semantics, overlay close, keyboard result navigation). Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.

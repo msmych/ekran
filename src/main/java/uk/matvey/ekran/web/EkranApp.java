@@ -46,6 +46,7 @@ public final class EkranApp {
         new SearchRoutes(searchService).register(app);
         new MovieRoutes(movieService).register(app);
         new PersonRoutes(personService).register(app);
+        app.get("/about", ctx -> ctx.render("about"));
         registerErrorHandlers(app);
         app.get("/healthz", ctx -> ctx.result("ok"));
         app.get("/health", ctx -> ctx.json(of("status", "UP")));

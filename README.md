@@ -4,9 +4,8 @@ Quick movie search — a fast, no-bloat movie discovery web app. Open the site, 
 appear as you type, open a movie, jump to a director's/actor's/writer's filmography.
 
 Step 1 is TMDB-backed: Javalin (no Spring), server-rendered Thymeleaf + HTMX, no frontend framework,
-no persistence. See [`docs/`](docs/) for the full spec and
-[`quick_movie_search_deployment_strategy.md`](quick_movie_search_deployment_strategy.md) for the
-deployment plan (implemented below, minus PostgreSQL which is deferred).
+no persistence. See [`docs/`](docs/) for the full spec; the deployment plan is documented in the
+Deployment section below and in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
 
 ## Requirements
 
@@ -61,7 +60,7 @@ Then open <http://localhost:7070>.
 ## Deployment
 
 Single-VPS production: nginx (TLS, Let's Encrypt) → app container, no database yet.
-Full plan in [`quick_movie_search_deployment_strategy.md`](quick_movie_search_deployment_strategy.md).
+Details in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
 
 **Local development (Docker):**
 
@@ -130,11 +129,13 @@ Search-as-you-type is HTMX with a 100 ms debounce and `hx-sync="this: replace"` 
 in-flight request and replaces it, so stale responses can't overwrite newer results and the
 final typed state always fires).
 
-The search bar is on every page (shared `searchbar.html` fragment). On the homepage it searches
-live in place; on every other page it's a compact input tucked top-right that drops a results
-overlay below it (Wikipedia-style) — Escape or click-away closes it and you stay where you
-were. `/` or Cmd/Ctrl+K focuses it from anywhere. App JavaScript is just vendored
-`htmx.min.js` (2.0.4) plus a ~40-line `search.js` (hotkeys, Escape, click-away).
+The search bar is on every page (shared `searchbar.html` fragment) with a `⌘K` tip badge.
+On the homepage it searches live in place; on every other page it's a compact input tucked
+top-right that drops a results overlay below it (Wikipedia-style) — Escape or click-away
+closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywhere; results
+are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
+[about page](/about) is linked from the footer. App JavaScript is just vendored
+`htmx.min.js` (2.0.4) plus a ~150-line `search.js` (hotkeys, Escape, click-away, keyboard nav).
 
 ## Project layout
 
@@ -152,6 +153,5 @@ src/main/java/uk/matvey/ekran/
 ## Roadmap (not in step 1)
 
 - Persons in search results (search currently returns movies only)
-- Keyboard result navigation
 - UI polish
 - PostgreSQL-backed local knowledge base with TMDB refresh (see `docs/data-model.md`)

@@ -23,7 +23,7 @@ This is **not** a Letterboxd/IMDb replacement. No social layer, reviews, feeds, 
 | Root package | `uk.matvey.ekran` |
 | Web framework | Javalin (no Spring) |
 | Template engine | Thymeleaf (server-side rendering) |
-| Frontend | Server-rendered HTML + HTMX (vendored locally) + one ~40-line first-party `search.js`, basic no-frills UI in Step 1 |
+| Frontend | Server-rendered HTML + HTMX (vendored locally) + one small first-party `search.js` (~150 lines), basic no-frills UI in Step 1 |
 | Search from any page | Search bar on every page: live in-page on the homepage, compact overlay panel (Wikipedia-style) elsewhere; `/` and Cmd/Ctrl+K focus it from anywhere |
 | TMDB auth | v4 Bearer token (`Authorization: Bearer …`), env var only |
 | Search scope | **Movies only** in Step 1; persons search is a follow-up step |
@@ -58,8 +58,9 @@ The user can go from an empty browser tab to the relevant movie/person informati
 ## Deferred to a follow-up step (explicitly out of Step 1)
 
 - **Persons in search results** — the search box returns movies only; we'll design how to blend people into results (or a separate persons search) as the next step. Person pages/filmographies remain in scope and are reachable from movie pages.
-- **Keyboard result navigation** — skipped for now; approach to be designed and discussed separately.
 - **UI polish** — deliberately basic UI in Step 1; visual direction to be figured out later.
+
+Keyboard result navigation (`↓`/`↑`/`Ctrl N`/`Ctrl P` + `Enter` to open) was originally deferred but has since been implemented — see `search-interaction.md`.
 
 ## Step 2 direction (not MVP work)
 

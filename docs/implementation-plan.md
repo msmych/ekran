@@ -11,7 +11,6 @@ ekran/
 ├── gradle/ + gradlew
 ├── README.md
 ├── docs/                        ← these specs
-├── quick_movie_search_agent_brief.docx
 └── src/
     ├── main/
     │   ├── java/uk/matvey/ekran/

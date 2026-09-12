@@ -48,14 +48,21 @@ Note the strategy choice: htmx's `abort` is **not** "new request aborts the old 
 
 ## Hotkeys and overlay close: `search.js`
 
-Hotkeys and overlay dismissal live in a single ~40-line file, `static/js/search.js`, loaded (deferred) on every page — the app's only JavaScript besides vendored htmx. A plain `document`-level keydown listener (not an inline `hx-on` handler):
+Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~150 lines), loaded (deferred) on every page — the app's only JavaScript besides vendored htmx. A plain `document`-level keydown listener (not an inline `hx-on` handler):
 
 - `/` — vim/Google-style quick focus, matched via `event.code === 'Slash'` **and** `event.key === '/'` so it works on non-US keyboard layouts (`event.key` alone breaks on e.g. Cyrillic layouts, which is why the first inline-handler attempt "didn't work" in real use). Skipped while already typing in an input/textarea/select, so a `/` inside the search box is just a character.
 - `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux), matched via `event.code === 'KeyK'` — the modern standard (GitHub, Slack, Notion); works even from within the input, and selects the existing query for quick replacement.
 - `Escape` — overlay pages: close the panel (blur; query preserved, still on the same page). Home: clear the query and the results (`input` event dispatched so htmx refreshes the list).
 - Click outside the search area — blurs the input, closing the overlay even in browsers that don't move focus on clicks into non-focusable areas (Safari).
 
+The search bar shows a small `⌘K` / `Ctrl K` tip badge at its right edge (clickable — focuses the input). The label is platform-corrected by `search.js` and re-applied on every `htmx:afterSwap`, since boosted navigation re-inserts the raw template label and would otherwise reset it.
+
 Focus restore after boosted swaps needs no JS: htmx focuses `[autofocus]` content it swaps in, so landing back on the homepage re-focuses the input.
+
+## Mobile specifics
+
+- Mobile Safari/Chrome auto-zoom into inputs with a font-size below 16px, so `app.css` forces `#search-input` to 16px under `@media (pointer: coarse), (max-width: 640px)` (the rule is last in the file so it wins over the compact 14px site-search sizing).
+- Tapping a result in the overlay would otherwise never register as a click: on mobile the tap blurs the input *between* `pointerdown` and `click`, and the resulting `:focus-within` loss hides the panel — removing the link before the click lands. `search.js` therefore calls `preventDefault()` on `pointerdown` inside the results panel, keeping focus on the input until the click hits the link.
 
 ## Input rules
 
@@ -80,22 +87,22 @@ Detail pages hit TMDB and can take a moment, so all in-app navigation shows a pr
 - HTMX does not swap 4xx/5xx responses by default, which would leave a dead link silent. A `<meta name="htmx-config">` on every page configures `responseHandling` so 404 and 503 **do swap** (the friendly error pages render in place); other error statuses keep the default no-swap behavior.
 - Focus after a boosted swap back to the homepage is restored by htmx itself: it focuses `[autofocus]` elements in swapped-in content.
 
-## Keyboard navigation — deferred
+## Keyboard result navigation
 
-Result-list keyboard navigation (Up/Down selection, Enter-to-open, Escape semantics) is **out of Step 1 scope**; the approach will be designed and discussed separately. Until then, native browser behavior applies:
+While the search input has focus, `search.js` handles:
 
-- Tab moves through result links normally.
-- Enter in the input fires the `search` event → immediate HTMX search (already wired via the trigger).
-- Escape is handled by `search.js` (close overlay / clear home query — see above).
+- `↓` / `↑` — move the highlight through results (`Ctrl N` / `Ctrl P` are aliases, readline-style). Hijacked only when results exist — with an empty list the arrows move the text caret normally. The selection clamps at the ends (no wrap) and scrolls into view.
+- `Enter` — opens the highlighted result (its anchor is clicked, so boosted navigation + topbar spinner apply). With no highlight, Enter keeps its native behavior: the `search` event fires an immediate search.
+- Typing clears the highlight; the fresh results arrive via the swap anyway.
 
-Whatever we design later must keep result anchors as real `<a href>` elements (middle-click, open-in-new-tab, copy-link keep working for free).
+The highlight is a `.selected` class on the result anchor (`background` + accent inset outline, defined in `app.css`). Result anchors stay real `<a href>` elements — middle-click, open-in-new-tab, and copy-link keep working.
 
 ## HTMX vendoring
 
 - **Vendored: htmx 2.0.4** — committed at `src/main/resources/static/js/htmx.min.js`.
 - Load with `<script defer src="/js/htmx.min.js"></script>` — defer, not async-blocking; search still works via the `search`-trigger fallback if it hasn't loaded when the user starts typing.
 - No HTMX extensions (no `hyperscript`, no `htmx-ext-*`). The `input changed delay` trigger is built in.
-- The only other script is our own `static/js/search.js` (~40 lines: hotkeys, Escape, click-away) — see the hotkeys section above. No bundler, no framework.
+- The only other script is our own `static/js/search.js` (~150 lines: hotkeys, Escape, click-away, keyboard nav) — see the hotkeys section above. No bundler, no framework.
 
 ## Rate and behavior notes
 
