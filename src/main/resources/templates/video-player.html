@@ -1,0 +1,4 @@
+<div id="player" xmlns:th="http://www.thymeleaf.org">
+    <div th:replace="~{video-embed :: embed(${key}, true)}"></div>
+    <p class="video-title" th:if="${name} != null" th:text="${name}">Trailer</p>
+</div>

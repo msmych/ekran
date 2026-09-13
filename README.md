@@ -52,9 +52,10 @@ Then open <http://localhost:7070>.
 |---|---|
 | `/` | Search-first homepage |
 | `/search?q={query}` | Movie search — full page, or results-only fragment for HTMX |
-| `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable) |
+| `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable; Trailers link opens a dialog with all videos) |
 | `/persons/{tmdbId}` | Person overview + filmography |
 | `/persons/{tmdbId}/{directing\|acting\|writing}` | Department filmography |
+| `/videos/{key}` | HTMX-only YouTube player fragment (used by the movie page) |
 | `/health` `/healthz` | Health/readiness checks (no TMDB calls) |
 
 ## Deployment

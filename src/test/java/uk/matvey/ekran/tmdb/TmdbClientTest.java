@@ -66,7 +66,7 @@ class TmdbClientTest {
         client.movieWithCredits(348);
 
         assertThat(server.takeRequest().getPath())
-            .isEqualTo("/3/movie/348?append_to_response=credits&language=en-US");
+            .isEqualTo("/3/movie/348?append_to_response=credits%2Cvideos&language=en-US");
     }
 
     @Test

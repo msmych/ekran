@@ -1,6 +1,6 @@
 package uk.matvey.ekran.web;
 
-import static java.util.Map.of;
+import java.util.Map;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -10,7 +10,7 @@ import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.service.PersonService;
 import uk.matvey.ekran.web.viewmodels.PersonPageVm;
 
-public class PersonRoutes {
+public class PersonRoutes extends Routes {
 
     private final PersonService personService;
 
@@ -28,16 +28,7 @@ public class PersonRoutes {
         var person = personService.findById(id)
             .orElseThrow(() -> new NotFoundException("Person not found: " + id));
         var department = departmentKey == null ? null : parseDepartment(departmentKey);
-        ctx.render("person", of("vm", PersonPageVm.of(person, department)));
-    }
-
-    private long parseId(Context ctx) {
-        var raw = ctx.pathParam("id");
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            throw new NotFoundException("Invalid id: " + raw);
-        }
+        ctx.render("person", Map.of("vm", PersonPageVm.of(person, department)));
     }
 
     private Department parseDepartment(String key) {

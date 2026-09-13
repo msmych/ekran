@@ -7,6 +7,7 @@
                 </span>
                 <span class="info">
                     <span class="title" th:text="${item.title()}">Title</span>
+                    <span class="original-title" th:if="${item.originalTitle() != null}" th:text="${item.originalTitle()}">Original title</span>
                     <span class="meta">
                         <span th:if="${item.year() != null}" th:text="${item.year()}">1979</span>
                         <span th:if="${item.subtitle() != null}" th:text="${item.subtitle()}">7.8</span>

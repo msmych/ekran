@@ -6,6 +6,7 @@ public record SearchResult(
     long tmdbId,
     SearchType type,
     String title,
+    String originalTitle,
     Integer year,
     String subtitle,
     URI thumbUrl

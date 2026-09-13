@@ -17,6 +17,8 @@ public record Movie(
     URI backdropUrl,
     List<PersonLink> directors,
     List<PersonLink> writers,
-    List<PersonLink> cast
+    List<PersonLink> cast,
+    String originalLanguage,
+    List<MovieVideo> videos
 ) {
 }

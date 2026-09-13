@@ -1,6 +1,6 @@
 package uk.matvey.ekran.web;
 
-import static java.util.Map.of;
+import java.util.Map;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -30,7 +30,7 @@ public class SearchRoutes {
                 // :empty-based panel visibility collapses the overlay/home results container
                 ctx.result("");
             } else {
-                ctx.render("results", of("resultsVm", SearchResultsVm.of(normalized, searchService.search(normalized))));
+                ctx.render("results", Map.of("resultsVm", SearchResultsVm.of(normalized, searchService.search(normalized))));
             }
         } else {
             renderHome(ctx, normalized);
@@ -39,9 +39,9 @@ public class SearchRoutes {
 
     private void renderHome(Context ctx, String normalized) {
         if (normalized.isEmpty()) {
-            ctx.render("home", of());
+            ctx.render("home", Map.of());
         } else {
-            ctx.render("home", of("q", normalized, "resultsVm", SearchResultsVm.of(normalized, searchService.search(normalized))));
+            ctx.render("home", Map.of("q", normalized, "resultsVm", SearchResultsVm.of(normalized, searchService.search(normalized))));
         }
     }
 

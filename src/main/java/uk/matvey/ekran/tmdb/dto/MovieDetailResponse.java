@@ -12,6 +12,7 @@ public record MovieDetailResponse(
     long id,
     String title,
     String originalTitle,
+    String originalLanguage,
     String overview,
     String releaseDate,
     Integer runtime,
@@ -19,6 +20,7 @@ public record MovieDetailResponse(
     String posterPath,
     String backdropPath,
     List<Genre> genres,
-    CreditsResponse credits
+    CreditsResponse credits,
+    VideosResponse videos
 ) {
 }

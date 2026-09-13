@@ -138,6 +138,12 @@ body {
     font-size: 13px;
 }
 
+.result .original-title {
+    display: block;
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .result .meta span + span::before {
     content: "·";
     margin: 0 6px;
@@ -307,6 +313,101 @@ body {
     color: var(--muted);
     font-size: 13px;
     margin-left: 8px;
+}
+
+.trailers-row {
+    margin: 12px 0 0;
+}
+
+.trailers-button {
+    display: inline-block;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.trailers-button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#player {
+    margin: 0;
+}
+
+.video-embed {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+}
+
+.video-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.video-title {
+    margin: 6px 16px 0;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+dialog {
+    width: min(720px, calc(100% - 32px));
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.dialog-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 8px 10px 16px;
+}
+
+.dialog-head h2 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.dialog-close {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.dialog-close:hover {
+    color: inherit;
+    background: #f0f0f0;
+}
+
+.video-list {
+    border-top: 1px solid #eee;
+    margin-top: 12px;
+    padding: 4px 16px 12px;
+}
+
+.video-list li.selected a {
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .tabs {

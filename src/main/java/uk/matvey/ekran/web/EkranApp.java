@@ -1,6 +1,6 @@
 package uk.matvey.ekran.web;
 
-import static java.util.Map.of;
+import java.util.Map;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -47,9 +47,19 @@ public final class EkranApp {
         new MovieRoutes(movieService).register(app);
         new PersonRoutes(personService).register(app);
         app.get("/about", ctx -> ctx.render("about"));
+        app.get("/videos/{key}", ctx -> {
+            var key = ctx.pathParam("key");
+            if (!key.matches("[A-Za-z0-9_-]{6,}")) {
+                throw new NotFoundException("Invalid video key: " + key);
+            }
+            var name = ctx.queryParam("name");
+            ctx.render("video-player", name == null
+                ? Map.of("key", key)
+                : Map.of("key", key, "name", name));
+        });
         registerErrorHandlers(app);
         app.get("/healthz", ctx -> ctx.result("ok"));
-        app.get("/health", ctx -> ctx.json(of("status", "UP")));
+        app.get("/health", ctx -> ctx.json(Map.of("status", "UP")));
         return app;
     }
 
@@ -77,9 +87,9 @@ public final class EkranApp {
         ctx.status(status);
         if ("true".equalsIgnoreCase(ctx.header("HX-Request"))) {
             ctx.header("Cache-Control", "no-store");
-            ctx.render("error-fragment", of("message", message));
+            ctx.render("error-fragment", Map.of("message", message));
         } else {
-            ctx.render("error", of("message", message));
+            ctx.render("error", Map.of("message", message));
         }
     }
 }

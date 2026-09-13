@@ -1,9 +1,11 @@
 package uk.matvey.ekran.web.viewmodels;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 import uk.matvey.ekran.domain.Movie;
+import uk.matvey.ekran.domain.MovieVideo;
 
 public record MovieDetailVm(
     String title,
@@ -18,8 +20,16 @@ public record MovieDetailVm(
     List<PersonLinkVm> directors,
     List<PersonLinkVm> writers,
     List<PersonLinkVm> cast,
-    String tmdbUrl
+    String tmdbUrl,
+    List<VideoVm> videos
 ) {
+
+    public record VideoVm(
+        String key,
+        String name,
+        String type
+    ) {
+    }
 
     public static MovieDetailVm of(Movie movie) {
         return new MovieDetailVm(
@@ -35,8 +45,37 @@ public record MovieDetailVm(
             movie.directors().stream().map(d -> PersonLinkVm.of(d, "/directing")).toList(),
             movie.writers().stream().map(w -> PersonLinkVm.of(w, "/writing")).toList(),
             movie.cast().stream().map(c -> PersonLinkVm.of(c, "/acting")).toList(),
-            "https://www.themoviedb.org/movie/" + movie.tmdbId()
+            "https://www.themoviedb.org/movie/" + movie.tmdbId(),
+            rankVideos(movie.videos(), movie.originalLanguage()).stream().map(MovieDetailVm::toVideoVm).toList()
         );
+    }
+
+    private static VideoVm toVideoVm(MovieVideo video) {
+        return new VideoVm(video.key(), video.name(), video.type());
+    }
+
+    static List<MovieVideo> rankVideos(List<MovieVideo> videos, String originalLanguage) {
+        return videos.stream()
+            .sorted(
+                Comparator.comparingInt((MovieVideo v) -> typeRank(v.type()))
+                    .thenComparingInt(v -> v.official() ? 0 : 1)
+                    .thenComparingInt(v -> languageRank(v.language(), originalLanguage))
+                    .thenComparing(v -> v.publishedAt() == null ? "" : v.publishedAt(), Comparator.reverseOrder()))
+            .toList();
+    }
+
+    private static int typeRank(String type) {
+        return "Trailer".equals(type) ? 0 : "Teaser".equals(type) ? 1 : 2;
+    }
+
+    private static int languageRank(String language, String originalLanguage) {
+        if (language == null || language.isBlank()) {
+            return 2;
+        }
+        if (language.equalsIgnoreCase(originalLanguage)) {
+            return 0;
+        }
+        return "en".equalsIgnoreCase(language) ? 1 : 2;
     }
 
     private static String runtime(Integer minutes) {

@@ -8,6 +8,7 @@ import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.Filmography;
 import uk.matvey.ekran.domain.FilmographyItem;
 import uk.matvey.ekran.domain.Movie;
+import uk.matvey.ekran.domain.MovieVideo;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.Person;
 import uk.matvey.ekran.domain.PersonLink;
@@ -32,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RoutesTest {
 
     private static final SearchResult ALIEN =
-        new SearchResult(348, SearchType.MOVIE, "Alien", 1979, "8.2", URI.create("https://img/p.jpg"));
+        new SearchResult(348, SearchType.MOVIE, "Alien", null, 1979, "8.2", URI.create("https://img/p.jpg"));
 
     private static final Movie ALIEN_MOVIE = new Movie(
         348, "Alien", null, LocalDate.parse("1979-05-25"), 117,
@@ -40,7 +41,11 @@ class RoutesTest {
         URI.create("https://img/poster.jpg"), null,
         of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
         of(new PersonLink(2, "Dan O'Bannon", "Screenplay", Department.WRITING)),
-        of(new PersonLink(3, "Sigourney Weaver", "Ripley", Department.ACTING))
+        of(new PersonLink(3, "Sigourney Weaver", "Ripley", Department.ACTING)),
+        "en",
+        of(new MovieVideo("trailerKey1", "Official Trailer", "Trailer", true, "en", "1979-04-01T00:00:00Z"),
+           new MovieVideo("teaserKey1", "Teaser", "Teaser", true, "en", "1979-01-01T00:00:00Z"),
+           new MovieVideo("clipKey1", "Clip: Chestburster", "Clip", false, "en", "1979-05-01T00:00:00Z"))
     );
 
     private static final Person RIDLEY_SCOTT = new Person(
@@ -193,6 +198,25 @@ class RoutesTest {
     }
 
     @Test
+    void searchResultsShowOriginalTitleOnlyWhenDistinct() {
+        var wings = new SearchResult(1000, SearchType.MOVIE, "Wings of Desire", "Der Himmel über Berlin", 1987, "8.0", null);
+        var alien = new SearchResult(348, SearchType.MOVIE, "Alien", "Alien", 1979, "8.2", null);
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(of(wings, alien)),
+            id -> Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/search?q=wings");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("Der Himmel über Berlin");
+            assertThat(body.split("class=\"original-title\"", -1).length - 1).isEqualTo(1);
+        });
+    }
+
+    @Test
     void noResultsShowsFriendlyMessage() {
         var app = appWithRepositories(
             (q, p) -> new SearchResultPage(of()),
@@ -205,6 +229,87 @@ class RoutesTest {
 
             assertThat(response.code()).isEqualTo(200);
             assertThat(response.body().string()).contains("No results for");
+        });
+    }
+
+    @Test
+    void moviePageShowsTrailersLinkAndDialog() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/movies/348");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains(">Trailers (3)<");
+            assertThat(body).doesNotContain("▶");
+            assertThat(body).contains("<dialog id=\"trailers\">");
+            // best-ranked video frame loads on dialog open, but does not autoplay
+            assertThat(body).contains("https://www.youtube-nocookie.com/embed/trailerKey1?enablejsapi=1\"");
+            assertThat(body).doesNotContain("autoplay=1");
+            // ranked list inside the dialog; each item swaps the player in place
+            assertThat(body).contains("https://www.youtube.com/watch?v=trailerKey1");
+            assertThat(body).contains("https://www.youtube.com/watch?v=teaserKey1");
+            assertThat(body).contains("https://www.youtube.com/watch?v=clipKey1");
+            assertThat(body).contains("/videos/trailerKey1");
+            assertThat(body).contains("hx-target=\"#player\"");
+            assertThat(body).contains("<li class=\"selected\">");
+        });
+    }
+
+    @Test
+    void videoFragmentReturnsNocookieAutoplayPlayer() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/videos/validkey12?name=Official%20Trailer");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).doesNotContain("<!DOCTYPE");
+            assertThat(body).contains("<div id=\"player\">");
+            assertThat(body).contains("https://www.youtube-nocookie.com/embed/validkey12?enablejsapi=1&amp;autoplay=1");
+            assertThat(body).contains("Official Trailer");
+        });
+    }
+
+    @Test
+    void videoFragmentEscapesName() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/videos/validkey12?name=%3Cscript%3Ealert(1)%3C/script%3E");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).doesNotContain("<script>");
+            assertThat(body).contains("&lt;script&gt;");
+        });
+    }
+
+    @Test
+    void videoFragmentRejectsInvalidKeys() {
+        JavalinTest.test(app(), (server, http) -> {
+            assertThat(http.get("/videos/bad.key").code()).isEqualTo(404);
+            assertThat(http.get("/videos/ok").code()).isEqualTo(404);
+            assertThat(http.get("/videos/validkey12").code()).isEqualTo(200);
+        });
+    }
+
+    @Test
+    void moviePageWithoutVideosHasNoTrailersLinkOrDialog() {
+        var movie = new Movie(
+            100, "Movie", null, null, null,
+            of(), null, "Overview", null, null,
+            of(), of(), of(), null, of()
+        );
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(of()),
+            id -> Optional.of(movie),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/movies/100");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).doesNotContain("Trailers");
+            assertThat(body).doesNotContain("<dialog");
+            assertThat(body).doesNotContain("youtube");
         });
     }
 
@@ -238,6 +343,8 @@ class RoutesTest {
                new PersonLink(2, "Two", "Director", Department.DIRECTING)),
             of(new PersonLink(3, "Three", "Screenplay", Department.WRITING),
                new PersonLink(4, "Four", "Story", Department.WRITING)),
+            of(),
+            null,
             of()
         );
         var app = appWithRepositories(

@@ -11,6 +11,7 @@ record SearchResult(
     long tmdbId,
     SearchType type,            // MOVIE | PERSON — only MOVIE produced in Step 1
     String title,               // movie title or person name
+    String originalTitle,       // raw from TMDB; display layer hides it when same as title
     Integer year,               // release year, nullable
     String subtitle,            // movie: rating "8.2"; person: known-for dept (later step)
     URI thumbUrl                // absolute, nullable

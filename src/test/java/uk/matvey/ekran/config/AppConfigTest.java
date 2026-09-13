@@ -3,8 +3,8 @@ package uk.matvey.ekran.config;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.Map;
 
-import static java.util.Map.of;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -24,7 +24,7 @@ class AppConfigTest {
 
     @Test
     void readsOverridesAndStripsToken() {
-        var config = AppConfig.fromEnv(of(
+        var config = AppConfig.fromEnv(Map.of(
             "TMDB_API_TOKEN", "  tok  ",
             "PORT", "8080",
             "TMDB_BASE_URL", "https://tmdb-proxy.example.com/3",

@@ -13,7 +13,7 @@ Everything TMDB-specific lives in the `tmdb` package. Nothing outside it knows T
 | Purpose | Endpoint | Notes |
 |---|---|---|
 | Movie search | `GET /3/search/movie?query={q}&include_adult=false&page=1` | Only search endpoint in Step 1 |
-| Movie detail + credits | `GET /3/movie/{id}?append_to_response=credits&language=en-US` | **single** call per movie page |
+| Movie detail + credits | `GET /3/movie/{id}?append_to_response=credits,videos&language=en-US` | **single** call per movie page |
 | Person + film credits | `GET /3/person/{id}?append_to_response=movie_credits&language=en-US` | **single** call per person page |
 
 - One request per page view, enforced: movie page = 1 TMDB call, person page = 1 TMDB call, search = 1 TMDB call. No duplicate TMDB calls within a single request.
@@ -45,7 +45,8 @@ Everything TMDB-specific lives in the `tmdb` package. Nothing outside it knows T
 Jackson-mapped, package-reachable only from within `tmdb`:
 
 - `MovieSearchResponse { page, results: List<MovieSearchItem> }`
-- `MovieDetailResponse` (title, original_title, release_date, runtime, genres[], vote_average, overview, poster_path, backdrop_path, credits: `CreditsResponse{crew[], cast[]}`)
+- `MovieDetailResponse` (title, original_title, release_date, runtime, genres[], vote_average, overview, poster_path, backdrop_path, original_language, credits: `CreditsResponse{crew[], cast[]}`, videos: `VideosResponse{results[]}`)
+- `VideoItem` (`key, name, site, type, official, iso_639_1, published_at`) — the video DTO backing trailers
 - `PersonDetailResponse` (name, known_for_department, biography, profile_path, movie_credits: `PersonMovieCreditsResponse{crew[], cast[]}`)
 - Crew/cast item DTOs: `id, name, job, character, order, department, release_date, title`
 - DTOs tolerate missing fields (`@JsonIgnoreProperties(ignoreUnknown = true)`) — TMDB adds fields; the adapter must not break on unknown keys.
@@ -63,6 +64,7 @@ All TMDB knowledge ends here:
 - Person `movie_credits.crew` where `department == "Directing"` → directing filmography (job "Director"); `department == "Writing"` → writing filmography; `movie_credits.cast` → acting filmography (character).
 - Person detail `known_for_department` → `Department` enum (Directing/Acting/Writing/Other).
 - Search result mapping: each movie search item → `SearchResult` (type `MOVIE`, id, title, subtitle = vote average formatted "8.2" — search responses carry no genre names, year from release_date, thumbUrl from poster_path), preserving TMDB relevance order. Persons search mapping joins in the follow-up step.
+- `videos.results` → `List<MovieVideo>` (key, name, type, official, language, publishedAt): **YouTube-only** (`site == "YouTube"`, case-insensitive; Vimeo/other sites are dropped), `official` null → false, `iso_639_1` → `language`. Hero-pick ranking lives in the view model, not here — the adapter maps everything it is given.
 
 Mapping is pure functions with no HTTP/IO — trivially unit-testable (the core test target in `testing.md`).
 

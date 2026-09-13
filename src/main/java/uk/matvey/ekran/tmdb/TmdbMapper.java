@@ -15,6 +15,7 @@ import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.Filmography;
 import uk.matvey.ekran.domain.FilmographyItem;
 import uk.matvey.ekran.domain.Movie;
+import uk.matvey.ekran.domain.MovieVideo;
 import uk.matvey.ekran.domain.Person;
 import uk.matvey.ekran.domain.PersonLink;
 import uk.matvey.ekran.domain.SearchResult;
@@ -67,8 +68,24 @@ public class TmdbMapper {
             imageUrl("w780", response.backdropPath()),
             directors(crew),
             writers(crew),
-            principalCast(cast)
+            principalCast(cast),
+            response.originalLanguage(),
+            videos(response)
         );
+    }
+
+    private List<MovieVideo> videos(MovieDetailResponse response) {
+        var results = response.videos() == null ? null : response.videos().results();
+        return orEmpty(results).stream()
+            .filter(v -> "YouTube".equalsIgnoreCase(v.site()) && v.key() != null)
+            .map(v -> new MovieVideo(
+                v.key(),
+                v.name(),
+                v.type(),
+                Boolean.TRUE.equals(v.official()),
+                v.iso6391(),
+                v.publishedAt()))
+            .toList();
     }
 
     public Person toPerson(PersonDetailResponse response) {
@@ -96,6 +113,7 @@ public class TmdbMapper {
             item.id(),
             SearchType.MOVIE,
             item.title(),
+            item.originalTitle(),
             year(item.releaseDate()),
             ratingSubtitle(item.voteAverage()),
             imageUrl("w92", item.posterPath())

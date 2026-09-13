@@ -49,7 +49,7 @@ public class TmdbClient {
 
     public MovieDetailResponse movieWithCredits(long tmdbId) {
         var params = new LinkedHashMap<String, String>();
-        params.put("append_to_response", "credits");
+        params.put("append_to_response", "credits,videos");
         params.put("language", "en-US");
         return get("/movie/" + tmdbId, params, MovieDetailResponse.class, config.detailTimeout());
     }

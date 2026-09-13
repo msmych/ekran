@@ -55,7 +55,7 @@ class SearchServiceTest {
     @Test
     void passesResultsThrough() {
         var service = new SearchService((q, p) ->
-            new SearchResultPage(of(new SearchResult(1, SearchType.MOVIE, "Alien", 1979, null, null))));
+            new SearchResultPage(of(new SearchResult(1, SearchType.MOVIE, "Alien", null, 1979, null, null))));
 
         var page = service.search("alien");
 

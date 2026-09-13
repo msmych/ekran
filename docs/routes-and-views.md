@@ -12,6 +12,7 @@
 | `GET /persons/{tmdbId}/acting` | Acting filmography | Full page |
 | `GET /persons/{tmdbId}/writing` | Writing credits | Full page |
 | `GET /about` | About the app (author link, shortcuts list) | Full page |
+| `GET /videos/{key}` | YouTube player fragment for trailer/video playback | HTMX fragment |
 
 All pages are server-rendered by Thymeleaf. No client-side routing.
 
@@ -44,7 +45,7 @@ Edge cases:
 
 Compact row, in TMDB relevance order:
 
-- **Movie row:** poster thumbnail (w92), title, release year, rating as subtitle (the movie search response carries no cast/crew or genre names — `vote_average` is the free high-value field). Links to `/movies/{id}`.
+- **Movie row:** poster thumbnail (w92), title, original title (shown under the title, muted — only when it differs from the title; useful when searching by a foreign-language title), release year, rating as subtitle (the movie search response carries no cast/crew or genre names — `vote_average` is the free high-value field). Links to `/movies/{id}`.
 
 Persons will join the result list in a follow-up step; the `SearchType` marker in the view model exists so that addition does not reshape `SearchResultsVm`.
 
@@ -52,10 +53,18 @@ Keyboard result navigation: `↓`/`↑` (or `Ctrl N`/`Ctrl P`) move a highlight 
 
 ## `/movies/{tmdbId}` — movie detail
 
-One TMDB call (`/movie/{id}` with `append_to_response=credits` — see `tmdb-integration.md`). Layout, top to bottom:
+One TMDB call (`/movie/{id}` with `append_to_response=credits,videos` — see `tmdb-integration.md`). Layout, top to bottom:
 
 - Backdrop (optional, subtle) or poster (w342) on the side; title + original title (if different) as heading.
 - Meta line: year · runtime (`1h 52m` format) · genres (comma-joined) · rating (TMDB average, one decimal, e.g. `7.8 ★`).
+- **Videos (trailers)** — a `Trailers (N)` **button** on its own row below the info bits (no button when there are no videos), opening a native `<dialog id="trailers">` rendered server-side at the bottom of the page:
+  - The dialog is opened by a tiny delegated handler in `search.js` (`data-dialog` attributes). Escape, ✕ and backdrop click close it; focus trapping comes free from the platform.
+  - Layout: title bar (`Trailers`, ✕ at the top right), the best-ranked video's frame edge-to-edge at full dialog width, its caption close beneath it, then the full list of videos ranked best-first (ranking in `MovieDetailVm.rankVideos`): Trailer > Teaser > other types; official > non-official; original-language > English > other; newest `published_at` wins ties (null dates rank last). The currently playing video is highlighted in the list (accent color; the best-ranked one starts selected, the highlight follows picks).
+  - The initial frame is a `loading="lazy"` iframe **without autoplay** — a closed dialog is `display: none`, so nothing is fetched until the dialog actually opens; opening loads the frame paused (the user has not asked to play yet).
+  - Picking a video → HTMX `GET /videos/{key}?name=…` swaps the player fragment into the dialog (`hx-target="#player" hx-swap="outerHTML"`): the same frame with `autoplay=1` — the click is the explicit play intent, so autoplay is appropriate there. The embed markup lives in one shared fragment (`templates/video-embed.html`), parameterized by autoplay.
+  - Closing the dialog (Escape/✕/backdrop) pauses the video: hiding a dialog does not stop its audio, so `search.js` listens for the dialog's `close` event (fires for every close path) and sends YouTube's `pauseVideo` post-message to the frame — enabled by `enablejsapi=1` in the embed URL.
+  - Each list item also links to the real YouTube watch page (`https://www.youtube.com/watch?v={key}`) — progressive enhancement: works with JS off, nicer with it. The `Trailers` link itself falls back to the best-ranked video's watch page.
+  - **CDN exception:** the `youtube-nocookie.com` iframe (fetched when the trailers dialog opens) is the sole third-party runtime request in the app — a deliberate trade-off, you can't proxy YouTube. Nothing loads while the dialog is closed.
 - Overview paragraph.
 - **Top crew:**
   - Director(s) — each name is a link to `/persons/{id}/directing`.
@@ -69,6 +78,14 @@ Crew headings are pluralized by count: "Director"/"Directors", "Writer"/"Writers
 Each detail page links to the upstream source: a "View on TMDB ↗" link (`https://www.themoviedb.org/movie/{id}` / `.../person/{id}`, `target="_blank" rel="noopener"`) near the header.
 
 Back-link to the originating search (`?back=/search?q=…` or simpler: browser back is fine in MVP; keep it simple — browser back only).
+
+## `/videos/{key}` — video player fragment
+
+HTMX-only route (registered in `EkranApp.create`, not a `*Routes` class — no service/IO involved):
+
+- `{key}` is a YouTube video id, validated `[A-Za-z0-9_-]{6,}` — anything else is a 404 (never passes unvalidated input into an iframe URL). No TMDB call: everything needed (key, optional caption `?name=`) is in the request.
+- Renders `templates/video-player.html`: `<div id="player">` + the shared 16:9 `video-embed.html` fragment (`youtube-nocookie.com/embed/{key}?enablejsapi=1&autoplay=1` — `enablejsapi` lets the dialog send `pauseVideo` on close) + caption below. The `id="player"` is kept on the fragment so repeated swaps (switching between videos in the dialog) keep retargeting the same slot.
+- Only reached via HTMX from the trailers dialog on the movie page; deep-linking straight to it works but is pointless (a bare player with a caption).
 
 ## `/persons/{tmdbId}` and department variants
 
@@ -98,8 +115,8 @@ Layout:
 Templates never receive domain models with TMDB-shaped leftovers. `web/viewmodels` provides:
 
 - `HomePageVm` — nothing but autofocus flag (MVP).
-- `SearchResultsVm` — `query`, `List<ResultItemVm>` (`type: MOVIE|PERSON`, title, subtitle, year, imageUrl, href); only `MOVIE` is produced in Step 1.
-- `MovieDetailVm` — preformatted fields (runtime as `1h 52m`, rating as string, joined genres, resolved poster/backdrop URLs, `List<PersonLinkVm> directors/writers/cast` with `name, role, href`).
+- `SearchResultsVm` — `query`, `List<ResultItemVm>` (`type: MOVIE|PERSON`, title, `originalTitle` nulled by the view model when same-as/blank, subtitle, year, imageUrl, href); only `MOVIE` is produced in Step 1.
+- `MovieDetailVm` — preformatted fields (runtime as `1h 52m`, rating as string, joined genres, resolved poster/backdrop URLs, `List<PersonLinkVm> directors/writers/cast` with `name, role, href`), plus `List<VideoVm> videos` (`key, name, type`) ranked best-first by `rankVideos` (see `/movies/{tmdbId}`), so templates stay logic-free.
 - `PersonPageVm` — name, knownFor, bio, `Map<Department, List<FilmographyItemVm>>` or fixed fields per department page, current department for tab highlighting.
 
 All image URLs are absolute (resolved in the tmdb adapter) — templates contain no TMDB URL-construction logic.
@@ -124,8 +141,8 @@ Served from `src/main/resources/static/`:
 
 - `/css/app.css` — single lightweight local stylesheet, no framework, basic system font stack. No design polish in Step 1.
 - `/js/htmx.min.js` — vendored HTMX (see `search-interaction.md` for version pinning).
-- `/js/search.js` — the only first-party JS (~150 lines: hotkeys, Escape, overlay close, keyboard result navigation).
+- `/js/search.js` — the only first-party JS (~180 lines: hotkeys, Escape, overlay close, keyboard result navigation, native-dialog handling).
 - `/favicons/` — vendored favicon set (ico + PNG sizes + webmanifest); linked from the shared `head` fragment.
 - `/img/tmdb-logo.svg` — vendored TMDB logo for the attribution footer.
 
-No CDN references anywhere. App JS is minimal: vendored `htmx.min.js` plus one small first-party file, `/js/search.js` (~150 lines: hotkeys, Escape semantics, overlay close, keyboard result navigation). Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.
+No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus one small first-party file, `/js/search.js` (~185 lines: hotkeys, Escape semantics, overlay close, keyboard result navigation, native-dialog open/close, video-list selection). Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.

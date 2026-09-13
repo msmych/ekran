@@ -132,6 +132,57 @@
         }
     });
 
+    // native <dialog> handling: [data-dialog="id"] openers, ✕/backdrop/Escape closers;
+    // document-level so it survives htmx swaps
+    // closing the dialog pauses the video: display:none does not stop the audio,
+    // so on the dialog's `close` event (fires for every close path) we send
+    // YouTube's pauseVideo post-message (enabled by enablejsapi=1 in the embed URL)
+    function pauseVideos(dialog) {
+        var frames = dialog.querySelectorAll('iframe');
+        for (var k = 0; k < frames.length; k++) {
+            frames[k].contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":[]}', '*');
+        }
+    }
+
+    document.addEventListener('click', function (event) {
+        var video = event.target.closest('.video-list a');
+        if (video) {
+            var list = video.closest('.video-list');
+            var items = list.querySelectorAll('li');
+            for (var k = 0; k < items.length; k++) {
+                items[k].classList.remove('selected');
+            }
+            video.closest('li').classList.add('selected');
+            return;
+        }
+        var opener = event.target.closest('[data-dialog]');
+        if (opener) {
+            event.preventDefault();
+            var dialog = document.getElementById(opener.getAttribute('data-dialog'));
+            if (dialog && typeof dialog.showModal === 'function') {
+                if (!dialog.dataset.pauseHooked) {
+                    dialog.dataset.pauseHooked = '1';
+                    dialog.addEventListener('close', function () {
+                        pauseVideos(dialog);
+                    });
+                }
+                dialog.showModal();
+            }
+            return;
+        }
+        var closer = event.target.closest('[data-dialog-close]');
+        if (closer) {
+            var dialogToClose = closer.closest('dialog');
+            if (dialogToClose) {
+                dialogToClose.close();
+            }
+            return;
+        }
+        if (event.target.tagName === 'DIALOG') {
+            event.target.close();
+        }
+    });
+
     // Cmd+K tip: platform-correct label; document-level so it survives htmx swaps,
     // and re-applied after each swap (boosted navigation re-inserts the raw template label)
     function applyKbdLabel() {

@@ -48,7 +48,7 @@ Note the strategy choice: htmx's `abort` is **not** "new request aborts the old 
 
 ## Hotkeys and overlay close: `search.js`
 
-Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~150 lines), loaded (deferred) on every page — the app's only JavaScript besides vendored htmx. A plain `document`-level keydown listener (not an inline `hx-on` handler):
+Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~185 lines), loaded (deferred) on every page — the app's only JavaScript besides vendored htmx. A plain `document`-level keydown listener (not an inline `hx-on` handler):
 
 - `/` — vim/Google-style quick focus, matched via `event.code === 'Slash'` **and** `event.key === '/'` so it works on non-US keyboard layouts (`event.key` alone breaks on e.g. Cyrillic layouts, which is why the first inline-handler attempt "didn't work" in real use). Skipped while already typing in an input/textarea/select, so a `/` inside the search box is just a character.
 - `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux), matched via `event.code === 'KeyK'` — the modern standard (GitHub, Slack, Notion); works even from within the input, and selects the existing query for quick replacement.
@@ -102,7 +102,7 @@ The highlight is a `.selected` class on the result anchor (`background` + accent
 - **Vendored: htmx 2.0.4** — committed at `src/main/resources/static/js/htmx.min.js`.
 - Load with `<script defer src="/js/htmx.min.js"></script>` — defer, not async-blocking; search still works via the `search`-trigger fallback if it hasn't loaded when the user starts typing.
 - No HTMX extensions (no `hyperscript`, no `htmx-ext-*`). The `input changed delay` trigger is built in.
-- The only other script is our own `static/js/search.js` (~150 lines: hotkeys, Escape, click-away, keyboard nav) — see the hotkeys section above. No bundler, no framework.
+- The only other script is our own `static/js/search.js` (~185 lines: hotkeys, Escape, click-away, keyboard nav, dialog + video-list selection) — see the hotkeys section above. No bundler, no framework.
 
 ## Rate and behavior notes
 

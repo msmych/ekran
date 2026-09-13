@@ -30,14 +30,16 @@ class TmdbMapperTest {
               "results": [
                 {"id": 348, "title": "Alien", "original_title": "Alien",
                  "release_date": "1979-05-25", "poster_path": "/abc.jpg", "vote_average": 8.2},
-                {"id": 9471, "title": "Aliens", "release_date": "", "poster_path": null}
+                {"id": 9471, "title": "Aliens", "release_date": "", "poster_path": null},
+                {"id": 1000, "title": "Wings of Desire", "original_title": "Der Himmel über Berlin",
+                 "release_date": "1987-09-16", "poster_path": null, "vote_average": 8.0}
               ]
             }
             """, MovieSearchResponse.class);
 
         var page = mapper.toSearchResults(response);
 
-        assertThat(page.results()).hasSize(2);
+        assertThat(page.results()).hasSize(3);
         var first = page.results().get(0);
         assertThat(first.tmdbId()).isEqualTo(348);
         assertThat(first.title()).isEqualTo("Alien");
@@ -49,6 +51,10 @@ class TmdbMapperTest {
         assertThat(second.year()).isNull();
         assertThat(second.subtitle()).isNull();
         assertThat(second.thumbUrl()).isNull();
+
+        var third = page.results().get(2);
+        assertThat(third.title()).isEqualTo("Wings of Desire");
+        assertThat(third.originalTitle()).isEqualTo("Der Himmel über Berlin");
     }
 
     @Test
@@ -91,6 +97,48 @@ class TmdbMapperTest {
         assertThat(movie.cast()).extracting(c -> c.name())
             .containsExactly("Sigourney Weaver", "Tom Skerritt");
         assertThat(movie.cast().get(0).role()).isEqualTo("Ripley");
+    }
+
+    @Test
+    void mapsYoutubeVideosAndFiltersOtherSites() throws Exception {
+        var response = objectMapper.readValue("""
+            {
+              "id": 348, "title": "Alien",
+              "original_language": "en",
+              "videos": {
+                "results": [
+                  {"key": "trailerKey", "name": "Official Trailer", "site": "YouTube",
+                   "type": "Trailer", "official": true, "iso_639_1": "en",
+                   "published_at": "1979-04-01T00:00:00Z"},
+                  {"key": "vimeoKey", "name": "Vimeo Trailer", "site": "Vimeo",
+                   "type": "Trailer", "official": true, "iso_639_1": "en",
+                   "published_at": "1979-04-01T00:00:00Z"}
+                ]
+              }
+            }
+            """, MovieDetailResponse.class);
+
+        var movie = mapper.toMovie(response);
+
+        assertThat(movie.originalLanguage()).isEqualTo("en");
+        assertThat(movie.videos()).hasSize(1);
+        var video = movie.videos().get(0);
+        assertThat(video.key()).isEqualTo("trailerKey");
+        assertThat(video.name()).isEqualTo("Official Trailer");
+        assertThat(video.type()).isEqualTo("Trailer");
+        assertThat(video.official()).isTrue();
+        assertThat(video.language()).isEqualTo("en");
+        assertThat(video.publishedAt()).isEqualTo("1979-04-01T00:00:00Z");
+    }
+
+    @Test
+    void missingVideosYieldEmptyList() throws Exception {
+        var response = objectMapper.readValue("""
+            {"id": 348, "title": "Alien"}
+            """, MovieDetailResponse.class);
+
+        assertThat(mapper.toMovie(response).videos()).isEmpty();
+        assertThat(mapper.toMovie(response).originalLanguage()).isNull();
     }
 
     @Test

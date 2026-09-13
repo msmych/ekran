@@ -23,6 +23,12 @@
                 <p class="external-links">
                     <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
                 </p>
+                <p class="trailers-row" th:if="${!vm.videos().isEmpty()}">
+                    <a class="trailers-button"
+                       th:href="'https://www.youtube.com/watch?v=' + ${vm.videos()[0].key()}"
+                       data-dialog="trailers"
+                       th:text="'Trailers (' + ${#lists.size(vm.videos())} + ')'">Trailers</a>
+                </p>
             </div>
         </header>
         <p class="overview" th:if="${vm.overview() != null}" th:text="${vm.overview()}">Overview</p>
@@ -54,6 +60,26 @@
                 </ul>
             </div>
         </section>
+        <dialog id="trailers" th:if="${!vm.videos().isEmpty()}">
+            <div class="dialog-head">
+                <h2>Trailers</h2>
+                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+            </div>
+            <div id="player">
+                <div th:replace="~{video-embed :: embed(${vm.videos()[0].key()}, false)}"></div>
+                <p class="video-title" th:text="${vm.videos()[0].name()}">Trailer</p>
+            </div>
+            <ul class="crew video-list">
+                <li th:each="v, iter : ${vm.videos()}" th:classappend="${iter.first} ? 'selected'">
+                    <a th:href="'https://www.youtube.com/watch?v=' + ${v.key()}"
+                       th:attr="hx-get=@{/videos/{key}(key=${v.key()},name=${v.name()})}"
+                       hx-target="#player"
+                       hx-swap="outerHTML"
+                       th:text="${v.name()}">Trailer</a>
+                    <span class="role" th:if="${v.type() != null}" th:text="${v.type()}">Trailer</span>
+                </li>
+            </ul>
+        </dialog>
     </article>
 </main>
 <footer th:replace="~{footer :: footer}"></footer>
