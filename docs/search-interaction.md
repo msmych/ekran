@@ -48,7 +48,7 @@ Note the strategy choice: htmx's `abort` is **not** "new request aborts the old 
 
 ## Hotkeys and overlay close: `search.js`
 
-Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~200 lines), loaded (deferred) on every page. A second first-party file, `static/js/marked.js` (~200 lines), handles the marking/QR feature — see the marking section in `routes-and-views.md`. A plain `document`-level keydown listener (not an inline `hx-on` handler):
+Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~220 lines), loaded (deferred) on every page. A second first-party file, `static/js/marked.js` (~450 lines), handles the marking/share feature — see the marking section in `routes-and-views.md`. A plain `document`-level keydown listener (not an inline `hx-on` handler):
 
 - `/` — vim/Google-style quick focus, matched via `event.code === 'Slash'` **and** `event.key === '/'` so it works on non-US keyboard layouts (`event.key` alone breaks on e.g. Cyrillic layouts, which is why the first inline-handler attempt "didn't work" in real use). Skipped while already typing in an input/textarea/select, so a `/` inside the search box is just a character.
 - `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux), matched via `event.code === 'KeyK'` — the modern standard (GitHub, Slack, Notion); works even from within the input, and selects the existing query for quick replacement.
@@ -62,7 +62,7 @@ Focus restore after boosted swaps needs no JS: htmx focuses `[autofocus]` conten
 ## Mobile specifics
 
 - Mobile Safari/Chrome auto-zoom into inputs with a font-size below 16px, so `app.css` forces `#search-input` to 16px under `@media (pointer: coarse), (max-width: 640px)` (the rule is last in the file so it wins over the compact 14px site-search sizing).
-- Tapping a result in the overlay would otherwise never register as a click: on mobile the tap blurs the input *between* `pointerdown` and `click`, and the resulting `:focus-within` loss hides the panel — removing the link before the click lands. `search.js` therefore calls `preventDefault()` on `pointerdown` inside the results panel, keeping focus on the input until the click hits the link.
+- Tapping a result in the overlay would otherwise never register as a click: on mobile the tap blurs the input *between* `pointerdown` and `click`, and the resulting `:focus-within` loss hides the panel — removing the link before the click lands. `search.js` therefore calls `preventDefault()` on `pointerdown` inside the results panel, keeping focus on the input until the click hits the link. Belt and braces for browsers that blur anyway (iOS Safari ignores `preventDefault` for that blur): the same handler arms a `pendingTap` flag (cleared on `pointerup`), and on `focusout` — if a tap is pending — a `.tap-through` class keeps the panel displayed for 350 ms, past the synthesized click. The class and flag are scoped to this race only; the panel still collapses on ordinary blur.
 
 ## Input rules
 
@@ -102,7 +102,7 @@ The highlight is a `.selected` class on the result anchor (`background` + accent
 - **Vendored: htmx 2.0.4** — committed at `src/main/resources/static/js/htmx.min.js`.
 - Load with `<script defer src="/js/htmx.min.js"></script>` — defer, not async-blocking; search still works via the `search`-trigger fallback if it hasn't loaded when the user starts typing.
 - No HTMX extensions (no `hyperscript`, no `htmx-ext-*`). The `input changed delay` trigger is built in.
-- Other scripts: our own `static/js/search.js` (~200 lines: hotkeys, Escape, click-away, keyboard nav, dialog + video-list selection — see the hotkeys section above) and `static/js/marked.js` (mark storage/toggle, share/QR). No bundler, no framework.
+- Other scripts: our own `static/js/search.js` (~220 lines: hotkeys, Escape, click-away, keyboard nav, dialog + video-list selection — see the hotkeys section above) and `static/js/marked.js` (mark storage/toggle, share/QR). No bundler, no framework.
 
 ## Rate and behavior notes
 

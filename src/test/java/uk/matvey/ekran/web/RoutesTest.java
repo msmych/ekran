@@ -222,6 +222,7 @@ class RoutesTest {
             var body = response.body().string();
             assertThat(body).contains("Der Himmel über Berlin");
             assertThat(body.split("class=\"original-title\"", -1).length - 1).isEqualTo(1);
+            assertThat(body.split("data-card-mark=", -1).length - 1).isEqualTo(2);
         });
     }
 
@@ -344,14 +345,101 @@ class RoutesTest {
             assertThat(response.code()).isEqualTo(200);
             var body = response.body().string();
             assertThat(body).contains("data-movie-id=\"348\"");
-            assertThat(body).contains("data-remove-movie=\"348\"");
+            assertThat(body).contains("data-card-mark=\"348\"");
+            assertThat(body).contains("card-info-link");
+            assertThat(body).contains("data-list-title>Marked movies<");
+            assertThat(body).contains("Directed by Ridley Scott");
             assertThat(body).contains("data-dialog=\"share\">Share</button>");
+            assertThat(body).contains("data-print-list");
+            assertThat(body).contains("data-mark-all");
+            assertThat(body).contains("data-clear-marks");
+            assertThat(body).contains("data-list-name-edit");
             assertThat(body).contains("<dialog id=\"share\">");
             assertThat(body).contains("data-qr-copy");
             assertThat(body).contains("1979");
             assertThat(body).contains("1h 57m");
             assertThat(body).doesNotContain("★");
             assertThat(body.indexOf("card-title\">Alien<")).isLessThan(body.indexOf("card-title\">Aliens<"));
+        });
+    }
+
+    @Test
+    void listPageRendersCustomNameFromParam() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> Optional.of(ALIEN_MOVIE),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=348&name=Sci-fi%20night&name=ignored");
+
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.body().string()).contains("data-list-title>Sci-fi night<");
+        });
+    }
+
+    @Test
+    void listPageEscapesAndTruncatesNameParam() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> Optional.of(ALIEN_MOVIE),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=348&name=Night%20%3Cb%3E" + "x".repeat(70));
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            // escaped, never raw HTML; truncated to 60 chars (9 + 51 x's)
+            assertThat(body).contains("data-list-title>Night &lt;b&gt;" + "x".repeat(51) + "<");
+            assertThat(body).doesNotContain("Night <b>");
+        });
+    }
+
+    @Test
+    void listPageBlankNameFallsBackToDefaultTitle() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> Optional.of(ALIEN_MOVIE),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=348&name=%20");
+
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.body().string()).contains("data-list-title>Marked movies<");
+        });
+    }
+
+    @Test
+    void listCardFragmentRendersSingleCardWithPrintExtras() {
+        var movie = new Movie(348, "Alien", "Alien: The Eighth Passenger", LocalDate.parse("1979-05-25"), 117,
+            List.of("Science Fiction"), 8.2, null, null, null,
+            List.of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
+            List.of(), List.of(), "en", List.of());
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> id == 348 ? Optional.of(movie) : Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var fragment = http.get("/list/card?movie=348");
+
+            assertThat(fragment.code()).isEqualTo(200);
+            var body = fragment.body().string();
+            assertThat(body).contains("<li");
+            assertThat(body).contains("data-movie-id=\"348\"");
+            assertThat(body).contains("data-card-mark=\"348\"");
+            assertThat(body).contains("1h 57m");
+            assertThat(body).contains("Original title: Alien: The Eighth Passenger");
+            assertThat(body).contains("Directed by Ridley Scott");
+            assertThat(body).doesNotContain("<!DOCTYPE");
+            assertThat(body).doesNotContain("<html");
+
+            assertThat(http.get("/list/card?movie=abc").code()).isEqualTo(404);
+            assertThat(http.get("/list/card?movie=348&movie=9471").code()).isEqualTo(404);
+            assertThat(http.get("/list/card?movie=999").code()).isEqualTo(404);
+            assertThat(http.get("/list/card").code()).isEqualTo(404);
         });
     }
 
@@ -557,7 +645,7 @@ assertThat(body).contains("href=\"/movies/348\"");
             assertThat(body).contains("https://img/alien-card.jpg");
             assertThat(body).contains("class=\"movie-cards\"");
             assertThat(body).contains("href=\"https://www.themoviedb.org/person/1\"");
-            assertThat(body).doesNotContain("data-remove-movie");
+            assertThat(body).contains("data-card-mark=\"348\"");
             assertThat(body).contains("not endorsed or certified by TMDB");
         });
     }

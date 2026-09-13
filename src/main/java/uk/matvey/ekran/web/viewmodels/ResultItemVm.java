@@ -1,8 +1,10 @@
 package uk.matvey.ekran.web.viewmodels;
 
 import uk.matvey.ekran.domain.SearchResult;
+import uk.matvey.ekran.domain.SearchType;
 
 public record ResultItemVm(
+    Long tmdbId,
     String href,
     String title,
     String originalTitle,
@@ -17,6 +19,7 @@ public record ResultItemVm(
             case PERSON -> "/persons/" + result.tmdbId();
         };
         return new ResultItemVm(
+            result.type() == SearchType.MOVIE ? result.tmdbId() : null,
             href,
             result.title(),
             distinctOriginalTitle(result),

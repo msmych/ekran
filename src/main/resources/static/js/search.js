@@ -107,14 +107,34 @@
 
     // mobile: keep focus on the input for taps inside the results panel, otherwise the
     // blur hides the panel (:focus-within) before the tap becomes a click on the link;
-    // same for the Cmd+K tip — preventDefault keeps focus handling to the click handlers
+    // same for the Cmd+K tip — preventDefault keeps focus handling to the click handlers.
+    // iOS Safari ignores the preventDefault for focus purposes, so a blur may still fire —
+    // the panel then gets a short grace window below, keeping it on screen long enough
+    // for the synthesized click to land on the result
+    var pendingTap = false;
     document.addEventListener('pointerdown', function (event) {
         if (!event.target.closest) {
             return;
         }
-        if (event.target.closest('.search-overlay') || event.target.closest('#search-kbd')) {
+        pendingTap = !!(event.target.closest('.search-overlay') || event.target.closest('#search-kbd'));
+        if (pendingTap) {
             event.preventDefault();
         }
+    });
+
+    document.addEventListener('pointerup', function () {
+        pendingTap = false;
+    });
+
+    document.addEventListener('focusout', function () {
+        var overlay = document.getElementById('search-overlay');
+        if (!overlay || !pendingTap) {
+            return;
+        }
+        overlay.classList.add('tap-through');
+        setTimeout(function () {
+            overlay.classList.remove('tap-through');
+        }, 350);
     });
 
     // click away from the overlay closes it even when the browser keeps focus on the input (Safari)

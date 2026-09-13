@@ -137,14 +137,16 @@ top-right that drops a results overlay below it (Wikipedia-style) — Escape or 
 closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywhere; results
 are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
 [about page](/about) is linked from the footer. App JavaScript is just vendored
-`htmx.min.js` (2.0.4) plus two first-party files: a ~200-line `search.js` (hotkeys,
-Escape, click-away, keyboard nav) and a ~200-line `marked.js` (marking + share/QR).
+`htmx.min.js` (2.0.4) plus two first-party files: a ~220-line `search.js` (hotkeys,
+Escape, click-away, keyboard nav) and a ~450-line `marked.js` (marking + share/QR).
 
 Movies can be **marked** (anonymous, `localStorage`-only — no accounts, no server state)
-via the bookmark toggle below the Trailers button or the `m` shortcut. The header shows
-`Marked · N` (hidden until your first mark), and that link (`/list?movie=…`) *is*
-the list — share it as-is or via the QR dialog on `/list`. Opening someone's
-shared URL never imports it into your own marks.
+via the bookmark toggle on the movie page, on any movie card, or straight from search
+results (`m` works too). The header shows `Marked · N` (hidden until your first mark),
+and that link (`/list?movie=…`) *is* the list — name it, share it as-is or via the QR
+dialog on `/list`, print it (with original titles and directors), or clear it there
+(after a confirm). A shared URL opened elsewhere reads "Shared list" with an
+"Add all to marked" button — it never imports silently.
 
 ## Project layout
 

@@ -95,6 +95,74 @@ body {
     overflow: hidden;
 }
 
+.results li {
+    position: relative;
+}
+
+/* shared bookmark toggle for list cards, person filmography and search
+   results; .marked is applied by marked.js from localStorage state */
+.card-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.card-mark svg {
+    display: block;
+}
+
+.card-mark svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+}
+
+.card-mark:hover,
+.card-mark.marked {
+    color: var(--accent);
+}
+
+.card-mark.marked svg path {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* on cards: below the poster, right-aligned — quiet, no circle */
+.movie-cards .card-mark {
+    position: static;
+    align-self: flex-end;
+    width: 30px;
+    height: 28px;
+    margin-top: 2px;
+    opacity: 0.5;
+}
+
+.movie-cards .card-mark:hover,
+.movie-cards .card-mark.marked {
+    opacity: 1;
+}
+
+/* in search results: quiet, at the row's top-right */
+.results .card-mark {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    opacity: 0.55;
+}
+
+.results .card-mark:hover,
+.results .card-mark.marked {
+    opacity: 1;
+}
+
 .result {
     display: flex;
     gap: 12px;
@@ -224,6 +292,12 @@ body {
 }
 
 .site-search:focus-within .search-overlay:not(:empty) {
+    display: block;
+}
+
+/* mobile blur race: a tap blurs the input before the click is synthesized —
+   keep the panel on screen briefly so the tap lands on the result */
+.search-overlay.tap-through {
     display: block;
 }
 
@@ -492,21 +566,58 @@ dialog::backdrop {
     font-size: 18px;
 }
 
+.list-name-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.list-name-edit:hover,
+.list-name-edit:focus-visible {
+    color: var(--accent);
+}
+
+.list-name-edit svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+}
+
+.list-name-input {
+    font: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+}
+
+.list-name-input:focus {
+    border-color: var(--accent);
+}
+
+/* "Copy" flips to "Copied" in place — the fixed min-width keeps the
+   dialog from resizing when the confirmation appears */
+.chip-button[data-qr-copy] {
+    min-width: 84px;
+}
+
+.chip-button[data-qr-copy].copied {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .list-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.share-feedback {
-    font-size: 13px;
-    color: var(--accent);
-    opacity: 0;
-    transition: opacity 150ms ease;
-}
-
-.share-feedback.visible {
-    opacity: 1;
 }
 
 .movie-cards {
@@ -520,6 +631,8 @@ dialog::backdrop {
 
 .movie-cards li {
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .card-link {
@@ -566,29 +679,9 @@ dialog::backdrop {
     margin: 0 4px;
 }
 
-.card-remove {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 24px;
-    height: 24px;
-    border: none;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-    opacity: 0;
-}
-
-.movie-cards li:hover .card-remove,
-.card-remove:focus-visible {
-    opacity: 1;
-}
-
-.card-remove:hover {
-    color: var(--accent);
+/* original title + directors: print-only detail, carried by every card */
+.card-print-extra {
+    display: none;
 }
 
 .empty-list {
@@ -606,26 +699,18 @@ dialog::backdrop {
     height: auto;
 }
 
+.qr-url-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 16px 4px;
+}
+
 .qr-url {
-    display: block;
     word-break: break-all;
     font-size: 12px;
     color: var(--accent);
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 8px 16px 4px;
-    font-family: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-.qr-url:hover {
-    color: var(--accent);
-}
-
-#share .share-feedback {
-    margin: 0 0 12px;
 }
 
 .tabs {
@@ -764,5 +849,59 @@ kbd {
 @media (max-width: 480px) {
     .poster {
         width: 110px;
+    }
+}
+/* print: the marked list as clean rows — no chrome, no posters */
+@media print {
+    #topbar,
+    .header-row,
+    .list-actions,
+    .list-name-edit,
+    .list-name-input,
+    .card-mark,
+    .card-poster,
+    .tmdb-footer {
+        display: none !important;
+    }
+
+    body {
+        background: #fff;
+    }
+
+    .marked-list .movie-cards {
+        display: block;
+    }
+
+    .marked-list .movie-cards li {
+        padding: 6px 0;
+        border-bottom: 1px solid #ddd;
+        break-inside: avoid;
+    }
+
+    .marked-list .card-info-link {
+        display: block;
+    }
+
+    .marked-list .card-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+    }
+
+    .marked-list .card-print-extra {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        color: #444;
+    }
+
+    .marked-list .card-print-extra span {
+        display: block;
+    }
+
+    .marked-list .card-meta span + span::before {
+        content: "·";
+        margin: 0 4px;
     }
 }

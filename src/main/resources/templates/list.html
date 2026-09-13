@@ -8,17 +8,27 @@
     <div th:replace="~{header :: header(false)}"></div>
     <section class="marked-list">
         <div class="list-head">
-            <h2>Marked movies</h2>
+            <h2 data-list-title th:text="${title}">Marked movies</h2>
+            <button type="button" class="list-name-edit" data-list-name-edit aria-label="Rename list"
+                    th:hidden="${cards.isEmpty()}">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/>
+                </svg>
+            </button>
+            <input type="text" class="list-name-input" data-list-name-input maxlength="60" aria-label="List name" hidden>
             <div class="list-actions">
-                <button type="button" class="chip-button" data-dialog="share">Share</button>
+                <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
+                <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
+                <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
+                <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
             </div>
         </div>
-        <ul class="movie-cards" th:if="${!cards.isEmpty()}">
+        <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c}, true)}"></li>
+                <li th:replace="~{movie-card :: card(${c})}"></li>
             </th:block>
         </ul>
-        <div class="empty-list" th:if="${cards.isEmpty()}">
+        <div class="empty-list" th:hidden="${!cards.isEmpty()}">
             <p>No marked movies yet.</p>
             <p>Search for a movie and mark it to build a list.</p>
         </div>
@@ -28,8 +38,10 @@
                 <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
             </div>
             <div class="qr-wrap" data-qr-target></div>
-            <button type="button" class="qr-url" data-qr-copy data-qr-url-text title="Copy link"></button>
-            <p class="share-feedback" data-share-feedback aria-live="polite"></p>
+            <div class="qr-url-row">
+                <a class="qr-url" data-qr-url-text href="#" target="_blank" rel="noopener"></a>
+                <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
+            </div>
         </dialog>
     </section>
 </main>

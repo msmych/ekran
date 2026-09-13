@@ -23,7 +23,7 @@ This is **not** a Letterboxd/IMDb replacement. No social layer, reviews, feeds, 
 | Root package | `uk.matvey.ekran` |
 | Web framework | Javalin (no Spring) |
 | Template engine | Thymeleaf (server-side rendering) |
-| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~200 lines, `marked.js` ~200 lines), basic no-frills UI in Step 1 |
+| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~220 lines, `marked.js` ~450 lines), basic no-frills UI in Step 1 |
 | Search from any page | Search bar on every page: live in-page on the homepage, compact overlay panel (Wikipedia-style) elsewhere; `/` and Cmd/Ctrl+K focus it from anywhere |
 | TMDB auth | v4 Bearer token (`Authorization: Bearer …`), env var only |
 | Search scope | **Movies only** in Step 1; persons search is a follow-up step |
