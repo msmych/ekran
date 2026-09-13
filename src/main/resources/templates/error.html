@@ -4,10 +4,7 @@
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
-    <div class="header-row">
-        <h1 class="logo"><a href="/">ekran</a></h1>
-        <th:block th:replace="~{searchbar :: searchbar(false)}"></th:block>
-    </div>
+    <div th:replace="~{header :: header(false)}"></div>
     <div class="error-page">
         <h2 th:text="${message}">Not found</h2>
     </div>

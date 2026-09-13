@@ -8,6 +8,7 @@ import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.MovieVideo;
 
 public record MovieDetailVm(
+    long tmdbId,
     String title,
     String originalTitle,
     Integer year,
@@ -33,6 +34,7 @@ public record MovieDetailVm(
 
     public static MovieDetailVm of(Movie movie) {
         return new MovieDetailVm(
+            movie.tmdbId(),
             movie.title(),
             movie.originalTitle(),
             movie.releaseDate() == null ? null : movie.releaseDate().getYear(),
@@ -78,7 +80,7 @@ public record MovieDetailVm(
         return "en".equalsIgnoreCase(language) ? 1 : 2;
     }
 
-    private static String runtime(Integer minutes) {
+    static String runtime(Integer minutes) {
         if (minutes == null || minutes <= 0) {
             return null;
         }

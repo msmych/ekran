@@ -4,6 +4,6 @@ import java.util.List;
 
 public record FilmographySectionVm(
     String label,
-    List<FilmographyItemVm> items
+    List<MovieCardVm> items
 ) {
 }

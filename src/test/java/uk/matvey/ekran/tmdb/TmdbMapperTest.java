@@ -187,11 +187,11 @@ class TmdbMapperTest {
             .extracting(f -> f.title() + ":" + f.year())
             .containsExactly("Alien: Covenant:2017", "Blade Runner:1982", "Alien:1979");
         assertThat(person.filmography().writing())
-            .extracting(f -> f.title() + ":" + f.year() + ":" + f.role())
-            .containsExactly("Untitled:null:Writer");
+            .extracting(f -> f.title() + ":" + f.year())
+            .containsExactly("Untitled:null");
         assertThat(person.filmography().acting())
-            .extracting(f -> f.title() + ":" + f.role())
-            .containsExactly("Some Cameo:Himself");
+            .extracting(f -> f.title() + ":" + f.year())
+            .containsExactly("Some Cameo:1990");
     }
 
     @Test

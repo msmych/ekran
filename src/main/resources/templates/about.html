@@ -4,10 +4,7 @@
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
-    <div class="header-row">
-        <h1 class="logo"><a href="/">ekran</a></h1>
-        <th:block th:replace="~{searchbar :: searchbar(false)}"></th:block>
-    </div>
+    <div th:replace="~{header :: header(false)}"></div>
     <article class="about">
         <h2>About ekran</h2>
         <p><strong>ekran</strong> aspires to be the quickest movie search:
@@ -16,6 +13,7 @@
             <li>Live search with no page reloads, from any page</li>
             <li>Focus the search box with <kbd>/</kbd> or <kbd>⌘K</kbd> (Ctrl K)</li>
             <li>Navigate results with <kbd>↑</kbd> <kbd>↓</kbd> or <kbd>Ctrl N</kbd> <kbd>Ctrl P</kbd>, open with <kbd>Enter</kbd></li>
+            <li>Mark or unmark the movie you're viewing with <kbd>m</kbd></li>
         </ul>
         <p>Built by <a href="https://matvey.uk">Matvey Smychkov</a>.
             Movie data by <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.</p>

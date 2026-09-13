@@ -12,6 +12,8 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import java.util.Map;
+
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
@@ -38,14 +40,23 @@ public final class EkranApp {
 
         var app = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
-            cfg.staticFiles.add("/static", Location.CLASSPATH);
+            cfg.staticFiles.add(staticFiles -> {
+                staticFiles.directory = "/static";
+                staticFiles.location = Location.CLASSPATH;
+                staticFiles.headers = Map.of("Cache-Control", "no-cache");
+            });
             cfg.fileRenderer(new JavalinThymeleaf(templateEngine));
             cfg.requestLogger.http((ctx, ms) ->
                 log.info("{} {} -> {} ({} ms)", ctx.method(), ctx.path(), ctx.status(), ms == null ? "-" : Math.round(ms)));
         });
+        // explicit revalidation everywhere: without it browsers heuristically cache
+        // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
+        // and serves stale JS after deploys — mismatched markup/JS versions follow)
+        app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
         new SearchRoutes(searchService).register(app);
         new MovieRoutes(movieService).register(app);
         new PersonRoutes(personService).register(app);
+        new ListRoutes(movieService).register(app);
         app.get("/about", ctx -> ctx.render("about"));
         app.get("/videos/{key}", ctx -> {
             var key = ctx.pathParam("key");

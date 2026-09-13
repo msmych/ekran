@@ -1,6 +1,5 @@
 package uk.matvey.ekran.tmdb;
 
-import static java.util.List.of;
 
 import java.net.URI;
 import java.time.LocalDate;
@@ -8,7 +7,6 @@ import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Function;
 
 import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.domain.Department;
@@ -43,7 +41,7 @@ public class TmdbMapper {
 
     public SearchResultPage toSearchResults(MovieSearchResponse response) {
         if (response == null) {
-            return new SearchResultPage(of());
+            return new SearchResultPage(List.of());
         }
         var items = orEmpty(response.results());
         return new SearchResultPage(items.stream().map(this::toSearchResult).toList());
@@ -51,7 +49,7 @@ public class TmdbMapper {
 
     public Movie toMovie(MovieDetailResponse response) {
         var credits = response.credits() == null
-            ? new CreditsResponse(of(), of())
+            ? new CreditsResponse(List.of(), List.of())
             : response.credits();
         var crew = orEmpty(credits.crew());
         var cast = orEmpty(credits.cast());
@@ -90,7 +88,7 @@ public class TmdbMapper {
 
     public Person toPerson(PersonDetailResponse response) {
         var credits = response.movieCredits() == null
-            ? new PersonMovieCreditsResponse(of(), of())
+            ? new PersonMovieCreditsResponse(List.of(), List.of())
             : response.movieCredits();
         var crew = orEmpty(credits.crew());
         var cast = orEmpty(credits.cast());
@@ -101,8 +99,8 @@ public class TmdbMapper {
             response.biography(),
             imageUrl("h632", response.profilePath()),
             new Filmography(
-                filmography(crew, "Directing", CrewCredit::job),
-                filmography(crew, "Writing", CrewCredit::job),
+                filmography(crew, "Directing"),
+                filmography(crew, "Writing"),
                 filmographyFromCast(cast)
             )
         );
@@ -142,16 +140,16 @@ public class TmdbMapper {
             .toList();
     }
 
-    private List<FilmographyItem> filmography(List<CrewCredit> crew, String department, Function<CrewCredit, String> role) {
+    private List<FilmographyItem> filmography(List<CrewCredit> crew, String department) {
         return sortedByYear(crew.stream()
             .filter(c -> department.equals(c.department()))
-            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), role.apply(c)))
+            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), imageUrl("w185", c.posterPath())))
             .toList());
     }
 
     private List<FilmographyItem> filmographyFromCast(List<CastCredit> cast) {
         return sortedByYear(cast.stream()
-            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), c.character()))
+            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), imageUrl("w185", c.posterPath())))
             .toList());
     }
 
@@ -162,11 +160,11 @@ public class TmdbMapper {
     }
 
     private List<String> genres(MovieDetailResponse response) {
-        return response.genres() == null ? of() : response.genres().stream().map(Genre::name).toList();
+        return response.genres() == null ? List.of() : response.genres().stream().map(Genre::name).toList();
     }
 
     private static <T> List<T> orEmpty(List<T> list) {
-        return list == null ? of() : list;
+        return list == null ? List.of() : list;
     }
 
     private String originalTitle(String title, String originalTitle) {

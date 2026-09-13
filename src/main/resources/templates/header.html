@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div class="header-row" th:classappend="${live} ? 'home-header-row'" th:fragment="header(live)">
+    <h1 class="logo"><a href="/">ekran</a></h1>
+    <a class="marked-link" href="/list" data-marked-link hx-boost="false">Marked · <span data-marked-count>0</span></a>
+    <th:block th:replace="~{searchbar :: searchbar(${live})}"></th:block>
+</div>
+</body>
+</html>

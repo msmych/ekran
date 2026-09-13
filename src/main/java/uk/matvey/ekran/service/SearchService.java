@@ -1,6 +1,6 @@
 package uk.matvey.ekran.service;
 
-import static java.util.List.of;
+import java.util.List;
 
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.repository.SearchRepository;
@@ -19,7 +19,7 @@ public class SearchService {
     public SearchResultPage search(String query) {
         var normalized = query == null ? "" : query.trim();
         if (normalized.isEmpty() || normalized.length() > MAX_QUERY_LENGTH) {
-            return new SearchResultPage(of());
+            return new SearchResultPage(List.of());
         }
         return repository.search(normalized, FIRST_PAGE);
     }

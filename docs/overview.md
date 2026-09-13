@@ -23,7 +23,7 @@ This is **not** a Letterboxd/IMDb replacement. No social layer, reviews, feeds, 
 | Root package | `uk.matvey.ekran` |
 | Web framework | Javalin (no Spring) |
 | Template engine | Thymeleaf (server-side rendering) |
-| Frontend | Server-rendered HTML + HTMX (vendored locally) + one small first-party `search.js` (~185 lines), basic no-frills UI in Step 1 |
+| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~200 lines, `marked.js` ~200 lines), basic no-frills UI in Step 1 |
 | Search from any page | Search bar on every page: live in-page on the homepage, compact overlay panel (Wikipedia-style) elsewhere; `/` and Cmd/Ctrl+K focus it from anywhere |
 | TMDB auth | v4 Bearer token (`Authorization: Bearer …`), env var only |
 | Search scope | **Movies only** in Step 1; persons search is a follow-up step |
@@ -43,6 +43,7 @@ The user can go from an empty browser tab to the relevant movie/person informati
 - Person links are navigable from movie pages.
 - Person page with filmography, filterable by department (directing / acting / writing).
 - Deep-linkable URLs for movies, people, and searches.
+- Anonymous marking (localStorage, `m` shortcut) with a shareable `/list?movie=…` page — the URL is the list; share link + QR, no accounts, no server-side state.
 - Responsive layout for desktop and mobile.
 
 ## Explicit non-goals for MVP
@@ -50,10 +51,10 @@ The user can go from an empty browser tab to the relevant movie/person informati
 - No Spring / Spring Boot.
 - No React / Vue / Angular.
 - No PostgreSQL dependency (only a clean repository boundary).
-- No user ratings, reviews, watchlists, social features, recommendations, feeds.
+- No user ratings, reviews, server-side watchlists, social features, recommendations, feeds (anonymous localStorage marking + shared `/list` URLs exist — deliberately client-only, see `routes-and-views.md`).
 - No streaming-provider aggregation unless effectively free from the core implementation.
 - No attempt to mirror the complete TMDB data model.
-- No user accounts or persistent user-specific state.
+- No user accounts or persistent user-specific server-side state.
 
 ## Deferred to a follow-up step (explicitly out of Step 1)
 

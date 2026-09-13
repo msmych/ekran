@@ -52,7 +52,7 @@ public record PersonPageVm(
     }
 
     private static FilmographySectionVm section(String label, List<FilmographyItem> items) {
-        return new FilmographySectionVm(label, items.stream().map(FilmographyItemVm::of).toList());
+        return new FilmographySectionVm(label, items.stream().map(MovieCardVm::of).toList());
     }
 
     public record DepartmentTabVm(

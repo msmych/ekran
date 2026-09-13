@@ -12,6 +12,7 @@ public record CrewCredit(
     String title,
     String job,
     String department,
-    String releaseDate
+    String releaseDate,
+    String posterPath
 ) {
 }

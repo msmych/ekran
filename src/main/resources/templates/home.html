@@ -4,8 +4,7 @@
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
-    <h1 class="logo"><a href="/">ekran</a></h1>
-    <th:block th:replace="~{searchbar :: searchbar(true)}"></th:block>
+    <div th:replace="~{header :: header(true)}"></div>
     <div id="results" aria-live="polite">
         <th:block th:if="${resultsVm} != null" th:insert="~{results :: results}"></th:block>
     </div>

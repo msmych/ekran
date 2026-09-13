@@ -4,10 +4,7 @@
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
-    <div class="header-row">
-        <h1 class="logo"><a href="/">ekran</a></h1>
-        <th:block th:replace="~{searchbar :: searchbar(false)}"></th:block>
-    </div>
+    <div th:replace="~{header :: header(false)}"></div>
     <article class="person">
         <header class="person-head">
             <img class="profile" th:if="${vm.profileUrl() != null}" th:src="${vm.profileUrl()}" alt="">
@@ -15,7 +12,7 @@
                 <h2 th:text="${vm.name()}">Name</h2>
                 <p class="known-for" th:if="${vm.knownFor() != null}" th:text="'Known for ' + ${vm.knownFor()}">Known for Directing</p>
                 <p class="external-links">
-                    <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">View on TMDB ↗</a>
+                    <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
                 </p>
             </div>
         </header>
@@ -30,14 +27,10 @@
         </nav>
         <section class="filmography" th:each="s : ${vm.sections()}">
             <h3 th:text="${s.label()}">Directing</h3>
-            <ul>
-                <li th:each="i : ${s.items()}">
-                    <a th:href="${i.href()}" th:text="${i.title()}">Movie</a>
-                    <span class="meta">
-                        <span th:if="${i.year() != null}" th:text="${i.year()}">1994</span>
-                        <span th:if="${i.role() != null}" th:text="${i.role()}">Director</span>
-                    </span>
-                </li>
+            <ul class="movie-cards">
+                <th:block th:each="i : ${s.items()}">
+                    <li th:replace="~{movie-card :: card(${i}, false)}"></li>
+                </th:block>
             </ul>
         </section>
     </article>

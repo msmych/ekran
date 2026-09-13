@@ -10,9 +10,9 @@ import uk.matvey.ekran.domain.TmdbUnavailableException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static java.util.List.of;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.util.List;
 
 class SearchServiceTest {
 
@@ -23,7 +23,7 @@ class SearchServiceTest {
         var service = new SearchService((query, page) -> {
             capturedQuery.set(query);
             capturedPage.set(page);
-            return new SearchResultPage(of());
+            return new SearchResultPage(List.of());
         });
 
         service.search("  alien  ");
@@ -55,7 +55,7 @@ class SearchServiceTest {
     @Test
     void passesResultsThrough() {
         var service = new SearchService((q, p) ->
-            new SearchResultPage(of(new SearchResult(1, SearchType.MOVIE, "Alien", null, 1979, null, null))));
+            new SearchResultPage(List.of(new SearchResult(1, SearchType.MOVIE, "Alien", null, 1979, null, null))));
 
         var page = service.search("alien");
 
@@ -76,7 +76,7 @@ class SearchServiceTest {
     private static SearchService countingService(AtomicInteger calls) {
         return new SearchService((query, page) -> {
             calls.incrementAndGet();
-            return new SearchResultPage(of());
+            return new SearchResultPage(List.of());
         });
     }
 }

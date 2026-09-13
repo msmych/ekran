@@ -37,7 +37,7 @@ record Movie(
     List<PersonLink> cast       // principal, billing order
 ) {}
 
-record FilmographyItem(long movieTmdbId, String title, Integer year, String role) {}
+record FilmographyItem(long movieTmdbId, String title, Integer year, URI posterUrl) {}
 
 record Filmography(
     List<FilmographyItem> directing,   // sorted year desc

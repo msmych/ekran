@@ -24,7 +24,7 @@ Everything TMDB-specific lives in the `tmdb` package. Nothing outside it knows T
 ## Images
 
 - TMDB returns relative paths (`poster_path: "/abc.jpg"`); the adapter resolves them to absolute URLs at mapping time: `https://image.tmdb.org/t/p/{size}{path}`.
-- Sizes used: `w92` (search thumbs), `w342` (movie poster), `h632` (person profile), `w780` (backdrop). Base image URL is config (`TMDB_IMAGE_BASE_URL`, default `https://image.tmdb.org.tld/t/p` style default baked in; see `configuration-and-ops.md`).
+- Sizes used: `w92` (search thumbs), `w185` (filmography/list cards), `w342` (movie poster), `h632` (person profile), `w780` (backdrop). Base image URL is config (`TMDB_IMAGE_BASE_URL`, default `https://image.tmdb.org.tld/t/p` style default baked in; see `configuration-and-ops.md`).
 - Null/absent paths map to `null` in domain; templates render a CSS placeholder.
 
 ## HTTP client

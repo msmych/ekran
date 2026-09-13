@@ -12,6 +12,7 @@
 | `GET /persons/{tmdbId}/acting` | Acting filmography | Full page |
 | `GET /persons/{tmdbId}/writing` | Writing credits | Full page |
 | `GET /about` | About the app (author link, shortcuts list) | Full page |
+| `GET /list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, not from any server-side state | Full page |
 | `GET /videos/{key}` | YouTube player fragment for trailer/video playback | HTMX fragment |
 
 All pages are server-rendered by Thymeleaf. No client-side routing.
@@ -57,7 +58,7 @@ One TMDB call (`/movie/{id}` with `append_to_response=credits,videos` — see `t
 
 - Backdrop (optional, subtle) or poster (w342) on the side; title + original title (if different) as heading.
 - Meta line: year · runtime (`1h 52m` format) · genres (comma-joined) · rating (TMDB average, one decimal, e.g. `7.8 ★`).
-- **Videos (trailers)** — a `Trailers (N)` **button** on its own row below the info bits (no button when there are no videos), opening a native `<dialog id="trailers">` rendered server-side at the bottom of the page:
+- **Videos (trailers)** — a chip-styled `Trailers (N)` link on its own row below the info bits (pill-shaped, muted; no chip when there are no videos), opening a native `<dialog id="trailers">` rendered server-side at the bottom of the page:
   - The dialog is opened by a tiny delegated handler in `search.js` (`data-dialog` attributes). Escape, ✕ and backdrop click close it; focus trapping comes free from the platform.
   - Layout: title bar (`Trailers`, ✕ at the top right), the best-ranked video's frame edge-to-edge at full dialog width, its caption close beneath it, then the full list of videos ranked best-first (ranking in `MovieDetailVm.rankVideos`): Trailer > Teaser > other types; official > non-official; original-language > English > other; newest `published_at` wins ties (null dates rank last). The currently playing video is highlighted in the list (accent color; the best-ranked one starts selected, the highlight follows picks).
   - The initial frame is a `loading="lazy"` iframe **without autoplay** — a closed dialog is `display: none`, so nothing is fetched until the dialog actually opens; opening loads the frame paused (the user has not asked to play yet).
@@ -65,6 +66,7 @@ One TMDB call (`/movie/{id}` with `append_to_response=credits,videos` — see `t
   - Closing the dialog (Escape/✕/backdrop) pauses the video: hiding a dialog does not stop its audio, so `search.js` listens for the dialog's `close` event (fires for every close path) and sends YouTube's `pauseVideo` post-message to the frame — enabled by `enablejsapi=1` in the embed URL.
   - Each list item also links to the real YouTube watch page (`https://www.youtube.com/watch?v={key}`) — progressive enhancement: works with JS off, nicer with it. The `Trailers` link itself falls back to the best-ranked video's watch page.
   - **CDN exception:** the `youtube-nocookie.com` iframe (fetched when the trailers dialog opens) is the sole third-party runtime request in the app — a deliberate trade-off, you can't proxy YouTube. Nothing loads while the dialog is closed.
+- **Mark** — an icon-only toggle on its own row directly below the Trailers button: a bookmark icon (18px, outline muted → filled accent when marked; `aria-pressed` driven, constant size so nothing jumps). Toggles the movie in the visitor's `localStorage` (`ekran.markedMovies` — plain JSON array of TMDB IDs, insertion-ordered, deduped, corrupt or non-integer entries filtered on load, save failures ignored). No server round-trip — marking is browser state. The physical-key `m` shortcut does the same and is ignored while editing text or with modifier keys. The header (shared `templates/header.html` fragment on every page) shows `Marked · N` — on the homepage it shares the `ekran` logo row (search below); elsewhere it sits at the right, just left of the search bar. It is hidden at zero marks, but only from JS: the server always renders the link (progressive enhancement, so a stale or failed script can never hide the entry point); with working JS its `href` is kept in sync with the current marks, so the link is always directly shareable. The link carries `hx-boost="false"`: boosted anchors freeze their `href` at htmx process time, so a boosted Marked link navigated to a stale URL missing recently-marked movies (bug seen in production — the click must always read the live `href`). Other open tabs follow via the `storage` event, and a bfcache restore (browser back) re-syncs via the `pageshow` event — a restored page shows its stale snapshot and fires no scripts otherwise.
 - Overview paragraph.
 - **Top crew:**
   - Director(s) — each name is a link to `/persons/{id}/directing`.
@@ -75,7 +77,7 @@ Empty-value rules: omit a row entirely if there is no value (no "Runtime: —" n
 
 Crew headings are pluralized by count: "Director"/"Directors", "Writer"/"Writers" (template-side ternary on list size).
 
-Each detail page links to the upstream source: a "View on TMDB ↗" link (`https://www.themoviedb.org/movie/{id}` / `.../person/{id}`, `target="_blank" rel="noopener"`) near the header.
+Each detail page links to the upstream source: a "TMDB ↗" link (`https://www.themoviedb.org/movie/{id}` / `.../person/{id}`, `target="_blank" rel="noopener"`) near the header.
 
 Back-link to the originating search (`?back=/search?q=…` or simpler: browser back is fine in MVP; keep it simple — browser back only).
 
@@ -87,6 +89,17 @@ HTMX-only route (registered in `EkranApp.create`, not a `*Routes` class — no s
 - Renders `templates/video-player.html`: `<div id="player">` + the shared 16:9 `video-embed.html` fragment (`youtube-nocookie.com/embed/{key}?enablejsapi=1&autoplay=1` — `enablejsapi` lets the dialog send `pauseVideo` on close) + caption below. The `id="player"` is kept on the fragment so repeated swaps (switching between videos in the dialog) keep retargeting the same slot.
 - Only reached via HTMX from the trailers dialog on the movie page; deep-linking straight to it works but is pointless (a bare player with a caption).
 
+## `/list?movie={id}…` — shared movie list
+
+A public, read-only page rendered **from the URL** — no server-side state, cookies, or sessions (the visitor's own marks live in their browser's `localStorage`):
+
+- Repeated `movie` params are TMDB IDs. Parsing rules (`ListRoutes`): non-numeric/zero/negative/over-10-digit values are silently dropped, duplicates collapse (first occurrence wins), requested order is preserved, at most 100 IDs are honored (protects the server and keeps URLs/QRs sane).
+- IDs are resolved through `MovieService.findByIds` — TMDB has no batch endpoint, so it is one request per movie internally, but that stays out of the web layer; a 404/missing movie skips that card with a warning log and never fails the whole list.
+- Cards (shared `movie-card.html` fragment — the same card as the person filmography grids): poster, title, year, duration (`1h 52m`, no rating); each links to `/movies/{id}`; a ✕ remove action per card.
+- **Share** — one chip opening a native `<dialog>` (same `data-dialog` machinery as trailers) holding a QR of the *current* URL plus the readable URL styled as a link — click it to copy, with a brief "Link copied" confirmation. The QR is generated client-side on every dialog open by the vendored `qrcode.js`. Client-side by design: the URL is browser-owned state (removals rewrite it via `history.replaceState`), and a server-side QR endpoint would be an open QR-generator abuse vector.
+- Client behavior (`marked.js`): removing a card unmarks it locally (idempotent — following someone's shared URL never touches the visitor's own marks) and rewrites the address bar, so a refresh does not resurrect removed cards.
+- Empty (`/list` without params) → "No marked movies yet. Search for a movie and mark it to build a list."
+
 ## `/persons/{tmdbId}` and department variants
 
 One TMDB call (`/person/{id}` with `append_to_response=movie_credits` — see `tmdb-integration.md`).
@@ -95,10 +108,7 @@ Layout:
 
 - Name, known-for department (e.g. "Known for Directing").
 - Optional short biography if already in the response — trimmed to ~2 lines (no truncation JS in MVP; CSS `line-clamp` is acceptable).
-- Filmography — grouped sections by department, each a simple list of movies with year + role:
-  - **Directing:** title, year, job (`Director`).
-  - **Writing:** title, year, job (`Screenplay` / `Writer` / `Story`).
-  - **Acting:** title, year, character name.
+- Filmography — grouped sections by department, each rendered as the shared movie-card grid (`movie-card.html`, same cards as `/list`, minus the remove action): poster, title, year — and no role line (the section heading already says Directing/Writing/Acting, and repeating `Director` on every card was noise). Duration is deliberately not shown: TMDB's person-credits payload has no `runtime`, and fetching it per credit would cost one detail call per movie (a busy person = 50–100+ calls per page, against the one-call-per-page rule).
 - Filmography lists are sorted by release year descending; undated items go last. Duplicate movies across departments stay in each relevant section.
 - Every movie title links to `/movies/{id}`.
 
@@ -117,7 +127,8 @@ Templates never receive domain models with TMDB-shaped leftovers. `web/viewmodel
 - `HomePageVm` — nothing but autofocus flag (MVP).
 - `SearchResultsVm` — `query`, `List<ResultItemVm>` (`type: MOVIE|PERSON`, title, `originalTitle` nulled by the view model when same-as/blank, subtitle, year, imageUrl, href); only `MOVIE` is produced in Step 1.
 - `MovieDetailVm` — preformatted fields (runtime as `1h 52m`, rating as string, joined genres, resolved poster/backdrop URLs, `List<PersonLinkVm> directors/writers/cast` with `name, role, href`), plus `List<VideoVm> videos` (`key, name, type`) ranked best-first by `rankVideos` (see `/movies/{tmdbId}`), so templates stay logic-free.
-- `PersonPageVm` — name, knownFor, bio, `Map<Department, List<FilmographyItemVm>>` or fixed fields per department page, current department for tab highlighting.
+- `PersonPageVm` — name, knownFor, bio, filmography sections of `MovieCardVm`s, current department for tab highlighting.
+- `MovieCardVm` — the one shared card shape (`tmdbId, title, year, meta, posterUrl`) with two factories: `of(Movie)` for `/list` (meta = formatted duration) and `of(FilmographyItem)` for person filmography grids (meta = null — see the runtime note there); `MovieDetailVm` carries its own `tmdbId` for the mark button's `data-movie-id`.
 
 All image URLs are absolute (resolved in the tmdb adapter) — templates contain no TMDB URL-construction logic.
 
@@ -139,10 +150,13 @@ The logo is the official TMDB mark, vendored locally at `static/img/tmdb-logo.sv
 
 Served from `src/main/resources/static/`:
 
+- **Cache policy:** every response — rendered pages and static assets — is served with `Cache-Control: no-cache` (always revalidate, cheap 304s via ETag). Explicit revalidation is required: Javalin/Jetty's default static header is `max-age=0` paired with a fake 1980 `Last-Modified`, and browsers (notably Safari) then apply heuristic caching that serves stale JS long after a deploy — a stale `search.js` against fresh markup breaks the trailers dialog and the mobile overlay-tap fix (symptoms seen in production: the Trailers link navigating to YouTube, overlay taps not following links).
 - `/css/app.css` — single lightweight local stylesheet, no framework, basic system font stack. No design polish in Step 1.
 - `/js/htmx.min.js` — vendored HTMX (see `search-interaction.md` for version pinning).
-- `/js/search.js` — the only first-party JS (~180 lines: hotkeys, Escape, overlay close, keyboard result navigation, native-dialog handling).
+- `/js/search.js` — first-party JS (~200 lines: hotkeys, Escape, overlay close, keyboard result navigation, native-dialog handling, video-list selection).
+- `/js/marked.js` — marking/list client (~200 lines: localStorage store, mark button + `m` shortcut, marked count/link, share/clipboard, QR render, list URL sync), loaded (deferred) on every page.
+- `/js/qrcode.js` — vendored `qrcode-generator` 1.4.4 (kazuhikoarase, MIT; auto type, SVG output), loaded only by `/list`.
 - `/favicons/` — vendored favicon set (ico + PNG sizes + webmanifest); linked from the shared `head` fragment.
 - `/img/tmdb-logo.svg` — vendored TMDB logo for the attribution footer.
 
-No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus one small first-party file, `/js/search.js` (~185 lines: hotkeys, Escape semantics, overlay close, keyboard result navigation, native-dialog open/close, video-list selection). Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.
+No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus two small first-party files, `/js/search.js` (~200 lines: hotkeys, Escape semantics, overlay close, keyboard result navigation, native-dialog open/close, video-list selection) and `/js/marked.js` (~200 lines: mark storage/toggle, marked-link sync, share/QR on `/list`), plus the QR library on `/list` only. Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.

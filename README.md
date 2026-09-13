@@ -55,6 +55,7 @@ Then open <http://localhost:7070>.
 | `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable; Trailers link opens a dialog with all videos) |
 | `/persons/{tmdbId}` | Person overview + filmography |
 | `/persons/{tmdbId}/{directing\|acting\|writing}` | Department filmography |
+| `/list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, no accounts; the Share chip opens a QR dialog with a copyable link |
 | `/videos/{key}` | HTMX-only YouTube player fragment (used by the movie page) |
 | `/health` `/healthz` | Health/readiness checks (no TMDB calls) |
 
@@ -104,7 +105,7 @@ Every page carries this attribution in the footer with a link to
 [themoviedb.org](https://www.themoviedb.org/) and the vendored TMDB logo
 (`src/main/resources/static/img/tmdb-logo.svg`), per TMDB's attribution terms.
 Movie and person pages also link to the corresponding `themoviedb.org` page
-("View on TMDB").
+("TMDB").
 
 ## Architecture
 
@@ -136,7 +137,14 @@ top-right that drops a results overlay below it (Wikipedia-style) — Escape or 
 closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywhere; results
 are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
 [about page](/about) is linked from the footer. App JavaScript is just vendored
-`htmx.min.js` (2.0.4) plus a ~150-line `search.js` (hotkeys, Escape, click-away, keyboard nav).
+`htmx.min.js` (2.0.4) plus two first-party files: a ~200-line `search.js` (hotkeys,
+Escape, click-away, keyboard nav) and a ~200-line `marked.js` (marking + share/QR).
+
+Movies can be **marked** (anonymous, `localStorage`-only — no accounts, no server state)
+via the bookmark toggle below the Trailers button or the `m` shortcut. The header shows
+`Marked · N` (hidden until your first mark), and that link (`/list?movie=…`) *is*
+the list — share it as-is or via the QR dialog on `/list`. Opening someone's
+shared URL never imports it into your own marks.
 
 ## Project layout
 

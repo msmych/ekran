@@ -26,9 +26,11 @@ import uk.matvey.ekran.service.SearchService;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
-import static java.util.List.of;
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
+import java.util.List;
 
 class RoutesTest {
 
@@ -37,24 +39,31 @@ class RoutesTest {
 
     private static final Movie ALIEN_MOVIE = new Movie(
         348, "Alien", null, LocalDate.parse("1979-05-25"), 117,
-        of("Science Fiction", "Horror"), 8.2, "In space no one can hear you scream.",
+        List.of("Science Fiction", "Horror"), 8.2, "In space no one can hear you scream.",
         URI.create("https://img/poster.jpg"), null,
-        of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
-        of(new PersonLink(2, "Dan O'Bannon", "Screenplay", Department.WRITING)),
-        of(new PersonLink(3, "Sigourney Weaver", "Ripley", Department.ACTING)),
+        List.of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
+        List.of(new PersonLink(2, "Dan O'Bannon", "Screenplay", Department.WRITING)),
+        List.of(new PersonLink(3, "Sigourney Weaver", "Ripley", Department.ACTING)),
         "en",
-        of(new MovieVideo("trailerKey1", "Official Trailer", "Trailer", true, "en", "1979-04-01T00:00:00Z"),
+        List.of(new MovieVideo("trailerKey1", "Official Trailer", "Trailer", true, "en", "1979-04-01T00:00:00Z"),
            new MovieVideo("teaserKey1", "Teaser", "Teaser", true, "en", "1979-01-01T00:00:00Z"),
            new MovieVideo("clipKey1", "Clip: Chestburster", "Clip", false, "en", "1979-05-01T00:00:00Z"))
+    );
+
+    private static final Movie ALIENS_MOVIE = new Movie(
+        9471, "Aliens", null, LocalDate.parse("1986-07-18"), 137,
+        List.of("Action", "Science Fiction"), 8.1, "This time it's war.",
+        URI.create("https://img/aliens-poster.jpg"), null,
+        List.of(), List.of(), List.of(), "en", List.of()
     );
 
     private static final Person RIDLEY_SCOTT = new Person(
         1, "Ridley Scott", Department.DIRECTING, "English filmmaker.",
         URI.create("https://img/profile.jpg"),
         new Filmography(
-            of(new FilmographyItem(348, "Alien", 1979, "Director")),
-            of(),
-            of(new FilmographyItem(500, "Some Cameo", 1990, "Himself"))
+            List.of(new FilmographyItem(348, "Alien", 1979, URI.create("https://img/alien-card.jpg"))),
+            List.of(),
+            List.of(new FilmographyItem(500, "Some Cameo", 1990, null))
         )
     );
 
@@ -109,7 +118,7 @@ class RoutesTest {
     @Test
     void searchHotkeysScriptLoadedOnEveryPage() {
         JavalinTest.test(app(), (server, http) -> {
-            for (var path : of("/", "/movies/348", "/persons/1", "/movies/999", "/about")) {
+            for (var path : List.of("/", "/movies/348", "/persons/1", "/movies/999", "/about")) {
                 var body = http.get(path).body().string();
                 assertThat(body).contains("src=\"/js/search.js\"");
                 assertThat(body).contains("href=\"/about\"");
@@ -202,7 +211,7 @@ class RoutesTest {
         var wings = new SearchResult(1000, SearchType.MOVIE, "Wings of Desire", "Der Himmel über Berlin", 1987, "8.0", null);
         var alien = new SearchResult(348, SearchType.MOVIE, "Alien", "Alien", 1979, "8.2", null);
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(of(wings, alien)),
+            (q, p) -> new SearchResultPage(List.of(wings, alien)),
             id -> Optional.empty(),
             id -> Optional.empty()
         );
@@ -219,7 +228,7 @@ class RoutesTest {
     @Test
     void noResultsShowsFriendlyMessage() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(of()),
+            (q, p) -> new SearchResultPage(List.of()),
             id -> Optional.empty(),
             id -> Optional.empty()
         );
@@ -229,6 +238,15 @@ class RoutesTest {
 
             assertThat(response.code()).isEqualTo(200);
             assertThat(response.body().string()).contains("No results for");
+        });
+    }
+
+    @Test
+    void responsesAreNeverHeuristicallyCached() {
+        JavalinTest.test(app(), (server, http) -> {
+            assertThat(http.get("/").header("Cache-Control")).isEqualTo("no-cache");
+            assertThat(http.get("/movies/348").header("Cache-Control")).isEqualTo("no-cache");
+            assertThat(http.get("/js/search.js").header("Cache-Control")).isEqualTo("no-cache");
         });
     }
 
@@ -294,11 +312,11 @@ class RoutesTest {
     void moviePageWithoutVideosHasNoTrailersLinkOrDialog() {
         var movie = new Movie(
             100, "Movie", null, null, null,
-            of(), null, "Overview", null, null,
-            of(), of(), of(), null, of()
+            List.of(), null, "Overview", null, null,
+            List.of(), List.of(), List.of(), null, List.of()
         );
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(of()),
+            (q, p) -> new SearchResultPage(List.of()),
             id -> Optional.of(movie),
             id -> Optional.empty()
         );
@@ -311,6 +329,140 @@ class RoutesTest {
             assertThat(body).doesNotContain("<dialog");
             assertThat(body).doesNotContain("youtube");
         });
+    }
+
+    @Test
+    void listPageRendersCardsFromMovieParams() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> id == 348 ? Optional.of(ALIEN_MOVIE) : id == 9471 ? Optional.of(ALIENS_MOVIE) : Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=348&movie=9471");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("data-movie-id=\"348\"");
+            assertThat(body).contains("data-remove-movie=\"348\"");
+            assertThat(body).contains("data-dialog=\"share\">Share</button>");
+            assertThat(body).contains("<dialog id=\"share\">");
+            assertThat(body).contains("data-qr-copy");
+            assertThat(body).contains("1979");
+            assertThat(body).contains("1h 57m");
+            assertThat(body).doesNotContain("★");
+            assertThat(body.indexOf("card-title\">Alien<")).isLessThan(body.indexOf("card-title\">Aliens<"));
+        });
+    }
+
+    @Test
+    void listPageNormalizesMovieParams() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> Optional.of(movieWithId(id)),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=abc&movie=348&movie=348&movie=-7&movie=0&movie=99999999999999&movie=%208%20&movie=+9");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            // 348 once (dedupe), 8 (trimmed), 9 ("+9" decodes to " 9"); the rest are invalid
+            assertThat(body.split("data-movie-id=\"", -1).length - 1).isEqualTo(3);
+        });
+    }
+
+    @Test
+    void listPageCapsAtHundredMovies() {
+        var query = IntStream.rangeClosed(1, 150)
+            .mapToObj(i -> "movie=" + i)
+            .collect(joining("&"));
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> Optional.of(movieWithId(id)),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?" + query);
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body.split("data-movie-id=\"", -1).length - 1).isEqualTo(100);
+            assertThat(body).contains("Movie 1");
+            assertThat(body).doesNotContain("Movie 101");
+        });
+    }
+
+    @Test
+    void listPageEmptyRendersEmptyState() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/list");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("No marked movies yet.");
+            assertThat(body).contains("Search for a movie and mark it to build a list.");
+            assertThat(body).doesNotContain("data-movie-id");
+        });
+    }
+
+    @Test
+    void listPageOmitsUnavailableMovies() {
+        var app = appWithRepositories(
+            (q, p) -> new SearchResultPage(List.of()),
+            id -> id == 348 ? Optional.of(ALIEN_MOVIE) : Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/list?movie=348&movie=999");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("Alien");
+            assertThat(body.split("data-movie-id=\"", -1).length - 1).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void moviePageShowsMarkToggleBelowTrailers() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/movies/348");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("class=\"mark-toggle\"");
+            assertThat(body).contains("data-mark-button");
+            assertThat(body).contains("aria-pressed=\"false\"");
+            assertThat(body).contains("data-movie-id=\"348\"");
+            assertThat(body).contains("aria-label=\"Mark movie (m)\"");
+            assertThat(body).contains("<path d=");
+            assertThat(body.indexOf("trailers-button")).isLessThan(body.indexOf("mark-toggle"));
+        });
+    }
+
+    @Test
+    void markedLinkInHeaderAlwaysRendered() {
+        JavalinTest.test(app(), (server, http) -> {
+            for (var path : List.of("/", "/movies/348", "/list")) {
+                // rendered visible server-side; JS hides it until the first
+                // mark so a stale script can never hide the entry point.
+                // hx-boost="false" keeps the click reading the live href:
+                // boosted anchors freeze their href at htmx process time,
+                // which sent stale mark lists on click (bug seen in prod)
+                var body = http.get(path).body().string();
+                assertThat(body).contains("data-marked-link hx-boost=\"false\">Marked");
+                assertThat(body).doesNotContain("data-marked-link hidden");
+                assertThat(body).contains("data-marked-count");
+            }
+        });
+    }
+
+    private static Movie movieWithId(long id) {
+        return new Movie(
+            id, "Movie " + id, null, null, null,
+            List.of(), null, null, null, null,
+            List.of(), List.of(), List.of(), null, List.of()
+        );
     }
 
     @Test
@@ -338,17 +490,17 @@ class RoutesTest {
     void moviePagePluralizesCrewHeadings() {
         var movie = new Movie(
             100, "Movie", null, null, null,
-            of(), null, null, null, null,
-            of(new PersonLink(1, "One", "Director", Department.DIRECTING),
+            List.of(), null, null, null, null,
+            List.of(new PersonLink(1, "One", "Director", Department.DIRECTING),
                new PersonLink(2, "Two", "Director", Department.DIRECTING)),
-            of(new PersonLink(3, "Three", "Screenplay", Department.WRITING),
+            List.of(new PersonLink(3, "Three", "Screenplay", Department.WRITING),
                new PersonLink(4, "Four", "Story", Department.WRITING)),
-            of(),
+            List.of(),
             null,
-            of()
+            List.of()
         );
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(of()),
+            (q, p) -> new SearchResultPage(List.of()),
             id -> Optional.of(movie),
             id -> Optional.empty()
         );
@@ -366,7 +518,7 @@ class RoutesTest {
     @Test
     void unknownMovieIdReturns404() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(of()),
+            (q, p) -> new SearchResultPage(List.of()),
             id -> {
                 throw new NotFoundException("no movie");
             },
@@ -401,8 +553,11 @@ class RoutesTest {
             assertThat(body).contains("href=\"/persons/1/directing\"");
             assertThat(body).contains("href=\"/persons/1/acting\"");
             assertThat(body).contains("href=\"/persons/1/writing\"");
-            assertThat(body).contains("href=\"/movies/348\"");
+assertThat(body).contains("href=\"/movies/348\"");
+            assertThat(body).contains("https://img/alien-card.jpg");
+            assertThat(body).contains("class=\"movie-cards\"");
             assertThat(body).contains("href=\"https://www.themoviedb.org/person/1\"");
+            assertThat(body).doesNotContain("data-remove-movie");
             assertThat(body).contains("not endorsed or certified by TMDB");
         });
     }
@@ -473,7 +628,7 @@ class RoutesTest {
 
     private Javalin app() {
         return appWithRepositories(
-            (q, p) -> new SearchResultPage(of(ALIEN)),
+            (q, p) -> new SearchResultPage(List.of(ALIEN)),
             id -> Optional.of(ALIEN_MOVIE),
             id -> Optional.of(RIDLEY_SCOTT)
         );

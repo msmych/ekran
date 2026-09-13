@@ -65,18 +65,20 @@ body {
 
 .search-indicator {
     display: none;
-}
-
-.htmx-request .search-indicator,
-.htmx-request.search-indicator {
-    display: inline-block;
+    position: absolute;
+    right: 34px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 14px;
     height: 14px;
-    margin-left: 8px;
     border: 2px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
+}
+
+.htmx-request.search-indicator {
+    display: block;
 }
 
 @keyframes spin {
@@ -167,6 +169,27 @@ body {
 
 .header-row .logo {
     margin: 0;
+}
+
+.marked-link {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.marked-link:hover {
+    color: var(--accent);
+}
+
+.home-header-row {
+    flex-wrap: wrap;
+}
+
+.home-header-row .home-search {
+    flex-basis: 100%;
+    margin-top: 16px;
 }
 
 .site-search {
@@ -285,27 +308,27 @@ body {
     color: var(--muted);
 }
 
-.crew, .filmography ul {
+.crew {
     list-style: none;
     margin: 0;
     padding: 0;
 }
 
-.crew li, .filmography li {
+.crew li {
     padding: 4px 0;
     border-bottom: 1px solid var(--border);
 }
 
-.crew li:last-child, .filmography li:last-child {
+.crew li:last-child {
     border-bottom: none;
 }
 
-.crew a, .filmography a {
+.crew a {
     color: var(--accent);
     text-decoration: none;
 }
 
-.crew a:hover, .filmography a:hover {
+.crew a:hover {
     text-decoration: underline;
 }
 
@@ -315,23 +338,65 @@ body {
     margin-left: 8px;
 }
 
-.trailers-row {
+.actions-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
     margin: 12px 0 0;
 }
 
-.trailers-button {
-    display: inline-block;
-    padding: 6px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    color: inherit;
-    text-decoration: none;
+.mark-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-basis: 100%;
+    padding: 2px;
+    margin-top: 4px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
 }
 
-.trailers-button:hover {
-    border-color: var(--accent);
+.mark-toggle svg {
+    display: block;
+}
+
+.mark-toggle svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+}
+
+.mark-toggle:hover,
+.mark-toggle.marked {
     color: var(--accent);
+}
+
+.mark-toggle.marked svg path {
+    fill: currentColor;
+    stroke: none;
+}
+
+.chip-button,
+.trailers-button {
+    display: inline-block;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    background: none;
+    cursor: pointer;
+}
+
+.chip-button:hover,
+.trailers-button:hover {
+    color: var(--accent);
+    border-color: var(--accent);
 }
 
 #player {
@@ -408,6 +473,159 @@ dialog::backdrop {
 .video-list li.selected a {
     color: var(--accent);
     font-weight: 600;
+}
+
+.marked-list {
+    margin-top: 8px;
+}
+
+.list-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.list-head h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.list-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.share-feedback {
+    font-size: 13px;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.share-feedback.visible {
+    opacity: 1;
+}
+
+.movie-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 16px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.movie-cards li {
+    position: relative;
+}
+
+.card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.card-poster {
+    display: block;
+    aspect-ratio: 2 / 3;
+    background: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-info {
+    display: block;
+    margin-top: 6px;
+}
+
+.card-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.card-meta {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.card-meta span + span::before {
+    content: "·";
+    margin: 0 4px;
+}
+
+.card-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.movie-cards li:hover .card-remove,
+.card-remove:focus-visible {
+    opacity: 1;
+}
+
+.card-remove:hover {
+    color: var(--accent);
+}
+
+.empty-list {
+    color: var(--muted);
+    margin-top: 24px;
+}
+
+#share {
+    width: min(320px, calc(100% - 32px));
+    text-align: center;
+}
+
+.qr-wrap svg {
+    width: 100%;
+    height: auto;
+}
+
+.qr-url {
+    display: block;
+    word-break: break-all;
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 8px 16px 4px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.qr-url:hover {
+    color: var(--accent);
+}
+
+#share .share-feedback {
+    margin: 0 0 12px;
 }
 
 .tabs {
@@ -529,6 +747,14 @@ kbd {
     .site-search #search-input:focus {
         width: min(260px, 60vw);
     }
+
+    #search-kbd {
+        display: none;
+    }
+
+    .search-indicator {
+        right: 12px;
+    }
 }
 
 .tmdb-footer img {
@@ -536,7 +762,7 @@ kbd {
 }
 
 @media (max-width: 480px) {
-    .movie-head, .person-head {
-        flex-direction: column;
+    .poster {
+        width: 110px;
     }
 }

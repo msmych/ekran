@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<li class="movie-card" th:fragment="card(c, removable)" th:attr="data-movie-id=${c.tmdbId()}">
+    <a class="card-link" th:href="'/movies/' + ${c.tmdbId()}">
+        <span class="card-poster">
+            <img th:if="${c.posterUrl() != null}" th:src="${c.posterUrl()}" alt="" loading="lazy">
+        </span>
+        <span class="card-info">
+            <span class="card-title" th:text="${c.title()}">Title</span>
+            <span class="card-meta">
+                <span th:if="${c.year() != null}" th:text="${c.year()}">1979</span>
+                <span th:if="${c.meta() != null}" th:text="${c.meta()}">1h 52m</span>
+            </span>
+        </span>
+    </a>
+    <button type="button" class="card-remove" th:if="${removable}"
+            th:attr="data-remove-movie=${c.tmdbId()}" aria-label="Remove">✕</button>
+</li>
+</body>
+</html>

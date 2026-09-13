@@ -36,6 +36,7 @@ Javalin test utilities (`app.get("/...")` against a started server with stubbed 
 - `/search?q=alien` with `HX-Request: true` header → 200 **fragment only** (assert no `<!DOCTYPE`/`<html>` — response is list-only), lightweight body.
 - `/search` blank → empty state; movie `404`; person `404`; unknown department `404`.
 - `/movies/{id}` → 200 with title, director link, cast links; `/persons/{id}` → 200 with filmography sections and tabs.
+- `/list?movie=…` → order-preserving render, param normalization (whitespace, `+`-encoded values, dupes collapse, invalid dropped), 100-movie cap, unavailable movies skipped, empty state.
 - TMDB unavailable → 503, friendly body, no stack trace, no TMDB payload leaked.
 
 ## Route/integration tests with real template rendering

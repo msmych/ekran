@@ -48,14 +48,14 @@ Note the strategy choice: htmx's `abort` is **not** "new request aborts the old 
 
 ## Hotkeys and overlay close: `search.js`
 
-Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~185 lines), loaded (deferred) on every page — the app's only JavaScript besides vendored htmx. A plain `document`-level keydown listener (not an inline `hx-on` handler):
+Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~200 lines), loaded (deferred) on every page. A second first-party file, `static/js/marked.js` (~200 lines), handles the marking/QR feature — see the marking section in `routes-and-views.md`. A plain `document`-level keydown listener (not an inline `hx-on` handler):
 
 - `/` — vim/Google-style quick focus, matched via `event.code === 'Slash'` **and** `event.key === '/'` so it works on non-US keyboard layouts (`event.key` alone breaks on e.g. Cyrillic layouts, which is why the first inline-handler attempt "didn't work" in real use). Skipped while already typing in an input/textarea/select, so a `/` inside the search box is just a character.
 - `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux), matched via `event.code === 'KeyK'` — the modern standard (GitHub, Slack, Notion); works even from within the input, and selects the existing query for quick replacement.
 - `Escape` — overlay pages: close the panel (blur; query preserved, still on the same page). Home: clear the query and the results (`input` event dispatched so htmx refreshes the list).
 - Click outside the search area — blurs the input, closing the overlay even in browsers that don't move focus on clicks into non-focusable areas (Safari).
 
-The search bar shows a small `⌘K` / `Ctrl K` tip badge at its right edge (clickable — focuses the input). The label is platform-corrected by `search.js` and re-applied on every `htmx:afterSwap`, since boosted navigation re-inserts the raw template label and would otherwise reset it.
+The search bar shows a small `⌘K` / `Ctrl K` tip badge at its right edge (clickable — focuses the input). The label is platform-corrected by `search.js` and re-applied on every `htmx:afterSwap`, since boosted navigation re-inserts the raw template label and would otherwise reset it. The badge is hidden on mobile (`@media (pointer: coarse), (max-width: 640px)`) — there is no keyboard to advertise; the search spinner moves to the right edge in its place.
 
 Focus restore after boosted swaps needs no JS: htmx focuses `[autofocus]` content it swaps in, so landing back on the homepage re-focuses the input.
 
@@ -74,7 +74,7 @@ Focus restore after boosted swaps needs no JS: htmx focuses `[autofocus]` conten
 
 - The input, its position, and everything above the fold **must not shift** when results appear: the results container sits below the input and grows downward; no layout reflow above it.
 - No full-page reloads during typing: only `#results` innerHTML swaps.
-- A subtle loading state (small spinner or `htmx-indicator` next to input) is allowed; it must not change layout.
+- A subtle loading state (small spinner or `htmx-indicator` next to input) is allowed; it must not change layout. The dedicated search spinner (`.search-indicator`) is absolutely positioned inside the input (left of the kbd tip) — appearing as an inline sibling would widen the compact `.site-search` container and shift the input mid-typing.
 - Empty results render a single calm line: "No results for 'xyz'".
 
 ## Spinner on navigation (movie/person pages)
@@ -102,7 +102,7 @@ The highlight is a `.selected` class on the result anchor (`background` + accent
 - **Vendored: htmx 2.0.4** — committed at `src/main/resources/static/js/htmx.min.js`.
 - Load with `<script defer src="/js/htmx.min.js"></script>` — defer, not async-blocking; search still works via the `search`-trigger fallback if it hasn't loaded when the user starts typing.
 - No HTMX extensions (no `hyperscript`, no `htmx-ext-*`). The `input changed delay` trigger is built in.
-- The only other script is our own `static/js/search.js` (~185 lines: hotkeys, Escape, click-away, keyboard nav, dialog + video-list selection) — see the hotkeys section above. No bundler, no framework.
+- Other scripts: our own `static/js/search.js` (~200 lines: hotkeys, Escape, click-away, keyboard nav, dialog + video-list selection — see the hotkeys section above) and `static/js/marked.js` (mark storage/toggle, share/QR). No bundler, no framework.
 
 ## Rate and behavior notes
 

@@ -12,6 +12,7 @@ public record CastCredit(
     String title,
     String character,
     Integer order,
-    String releaseDate
+    String releaseDate,
+    String posterPath
 ) {
 }

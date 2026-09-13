@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Marked — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<script defer src="/js/qrcode.js"></script>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <section class="marked-list">
+        <div class="list-head">
+            <h2>Marked movies</h2>
+            <div class="list-actions">
+                <button type="button" class="chip-button" data-dialog="share">Share</button>
+            </div>
+        </div>
+        <ul class="movie-cards" th:if="${!cards.isEmpty()}">
+            <th:block th:each="c : ${cards}">
+                <li th:replace="~{movie-card :: card(${c}, true)}"></li>
+            </th:block>
+        </ul>
+        <div class="empty-list" th:if="${cards.isEmpty()}">
+            <p>No marked movies yet.</p>
+            <p>Search for a movie and mark it to build a list.</p>
+        </div>
+        <dialog id="share">
+            <div class="dialog-head">
+                <h2>Share</h2>
+                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+            </div>
+            <div class="qr-wrap" data-qr-target></div>
+            <button type="button" class="qr-url" data-qr-copy data-qr-url-text title="Copy link"></button>
+            <p class="share-feedback" data-share-feedback aria-live="polite"></p>
+        </dialog>
+    </section>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>
