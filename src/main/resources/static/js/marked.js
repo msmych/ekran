@@ -117,7 +117,7 @@
         }
         var cardIds = visibleCardIds();
         var empty = cardIds.length === 0;
-        var yours = cardIds.every(isMarked);
+        var yours = empty || isOwnList();
         var name = urlName() || (yours && !empty ? storedName() : null);
         title.textContent = name || (yours ? 'Marked movies' : 'Shared list');
         setHidden('[data-dialog="share"]', empty);
@@ -130,9 +130,17 @@
             emptyState.hidden = !empty;
         }
         // keep your list's URL carrying its name, so copied/shared links include it
-        if (!empty && yours && storedName() && !urlName()) {
+        if (isOwnList() && storedName() && !urlName()) {
             syncListUrl();
         }
+    }
+
+    // your list only when the visible card set IS your marked set — a subset
+    // of your own marks (all cards marked, but you have more) still counts
+    // as a shared view and offers Add all to marked
+    function isOwnList() {
+        var cardIds = visibleCardIds();
+        return cardIds.length > 0 && cardIds.length === ids.length && cardIds.every(isMarked);
     }
 
     function visibleCardIds() {
@@ -202,8 +210,7 @@
         input.hidden = false;
         title.hidden = true;
         setHidden('[data-list-name-edit]', true);
-        var cardIds = visibleCardIds();
-        input.value = urlName() || (cardIds.length > 0 && cardIds.every(isMarked) ? storedName() : '') || '';
+        input.value = urlName() || (isOwnList() ? storedName() : '') || '';
         input.focus();
         input.select();
     }
@@ -223,8 +230,7 @@
             return;
         }
         var name = input.value.trim().slice(0, NAME_MAX) || null;
-        var cardIds = visibleCardIds();
-        var yours = cardIds.length > 0 && cardIds.every(isMarked);
+        var yours = isOwnList();
         if (yours) {
             try {
                 if (name) {

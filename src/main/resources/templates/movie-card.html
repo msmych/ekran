@@ -7,27 +7,29 @@
             <img th:if="${c.posterUrl() != null}" th:src="${c.posterUrl()}" alt="" loading="lazy">
         </span>
     </a>
-    <button type="button" class="card-mark"
-            th:attr="data-card-mark=${c.tmdbId()}"
-            aria-label="Mark movie"
-            aria-pressed="false">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M3.5 1.5h9a1 1 0 0 1 1 1v12l-5.5-3.7L2.5 14.5v-12a1 1 0 0 1 1-1z"/>
-        </svg>
-    </button>
-    <a class="card-link card-info-link" th:href="'/movies/' + ${c.tmdbId()}">
-        <span class="card-info">
-            <span class="card-title" th:text="${c.title()}">Title</span>
-            <span class="card-meta">
-                <span th:if="${c.year() != null}" th:text="${c.year()}">1979</span>
-                <span th:if="${c.meta() != null}" th:text="${c.meta()}">1h 52m</span>
+    <div class="card-details">
+        <a class="card-link card-info-link" th:href="'/movies/' + ${c.tmdbId()}">
+            <span class="card-info">
+                <span class="card-title" th:text="${c.title()}">Title</span>
+                <span class="card-meta">
+                    <span th:if="${c.year() != null}" th:text="${c.year()}">1979</span>
+                    <span th:if="${c.meta() != null}" th:text="${c.meta()}">1h 52m</span>
+                </span>
             </span>
-        </span>
-        <span class="card-print-extra">
-            <span th:if="${c.originalTitle() != null}" th:text="'Original title: ' + ${c.originalTitle()}">Original title</span>
-            <span th:if="${c.directors() != null}" th:text="'Directed by ' + ${c.directors()}">Directed by</span>
-        </span>
-    </a>
+            <span class="card-print-extra">
+                <span th:if="${c.originalTitle() != null}" th:text="'Original title: ' + ${c.originalTitle()}">Original title</span>
+                <span th:if="${c.directors() != null}" th:text="'Directed by ' + ${c.directors()}">Directed by</span>
+            </span>
+        </a>
+        <button type="button" class="card-mark"
+                th:attr="data-card-mark=${c.tmdbId()}"
+                aria-label="Mark movie"
+                aria-pressed="false">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M3.5 1.5h9a1 1 0 0 1 1 1v12l-5.5-3.7L2.5 14.5v-12a1 1 0 0 1 1-1z"/>
+            </svg>
+        </button>
+    </div>
 </li>
 </body>
 </html>
