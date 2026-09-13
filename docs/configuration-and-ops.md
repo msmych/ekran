@@ -67,3 +67,28 @@ Packaging via the Gradle `application` plugin (`./gradlew installDist` / `build`
   `:<commit-sha>` tag → SSH `docker compose pull`/`up -d` → health check → rollback to the
   previous tag on failure (`.deployed-image` on the server).
 - Production `.env` (with `TMDB_API_TOKEN`) exists only on the server, untracked.
+
+## Domains and TLS
+
+- Primary domain: **ekran.uk**. The legacy `ekran.matvey.uk` permanently redirects
+  (301, path-preserving) — its server block and certificate stay in place so the
+  redirect keeps working; drop both (plus the DNS record) once the migration settles.
+- Certificates: Let's Encrypt via the certbot webroot (`./certbot/www`, mounted into
+  nginx at `/var/www/certbot`); the port-80 block answers ACME challenges for both names.
+  Issue a new certificate **before** deploying a config that references it — nginx refuses
+  to load a 443 block whose cert files don't exist:
+
+  ```
+  docker run --rm \
+    -v "$HOME/ekran/certbot/conf:/etc/letsencrypt" \
+    -v "$HOME/ekran/certbot/www:/var/www/certbot" \
+    certbot/certbot certonly --webroot -w /var/www/certbot \
+    -d ekran.uk --email <email> --agree-tos --no-eff-email
+  ```
+
+- Renewal covers every lineage under `certbot/conf` (`certbot renew` with the same mounts),
+  followed by `docker compose exec -T nginx nginx -s reload`. Deploys reload nginx
+  automatically after the health check, so config-only changes roll out with any deploy.
+- Caveat: localStorage marks are origin-scoped — marks made on `ekran.matvey.uk` do not
+  follow visitors to `ekran.uk` (a 301 means the old origin never runs client code again).
+  Re-marking is the accepted cost of the move.

@@ -99,3 +99,8 @@ jobs:
 
             echo "$NEW_IMAGE" > .deployed-image
             echo "deployed $NEW_IMAGE"
+
+            # roll out nginx/conf.d changes (bind-mounted): reload keeps the old
+            # workers if the new config fails to load, so a bad conf never takes
+            # the site down — it just fails this deploy loudly
+            docker compose exec -T nginx nginx -s reload
