@@ -102,5 +102,6 @@ jobs:
 
             # roll out nginx/conf.d changes (bind-mounted): reload keeps the old
             # workers if the new config fails to load, so a bad conf never takes
-            # the site down — it just fails this deploy loudly
-            docker compose exec -T nginx nginx -s reload
+            # the site down — it just fails this deploy loudly. APP_IMAGE is set
+            # because compose interpolates the file for any subcommand, exec included
+            APP_IMAGE="$NEW_IMAGE" docker compose exec -T nginx nginx -s reload
