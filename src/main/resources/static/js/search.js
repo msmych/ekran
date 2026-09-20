@@ -105,36 +105,34 @@
         });
     }, true);
 
-    // mobile: keep focus on the input for taps inside the results panel, otherwise the
-    // blur hides the panel (:focus-within) before the tap becomes a click on the link;
-    // same for the Cmd+K tip — preventDefault keeps focus handling to the click handlers.
-    // iOS Safari ignores the preventDefault for focus purposes, so a blur may still fire —
-    // the panel then gets a short grace window below, keeping it on screen long enough
-    // for the synthesized click to land on the result
-    var pendingTap = false;
+    // mobile: tapping a result blurs the input between `pointerdown` and the
+    // synthesized `click`, and the `:focus-within` loss would hide the panel —
+    // removing the link before the click lands. Preventing `pointerdown` keeps the
+    // focus on desktop, but on touch browsers it also suppresses the synthesized
+    // click entirely (the tap never navigates), so for touch the panel instead gets
+    // a short `.tap-through` grace window armed at `pointerdown` — before any blur —
+    // keeping it on screen long enough for the click to land on the result.
+    // With a mouse, preventDefault keeps the focus on the input (clicks still fire);
+    // same for the Cmd+K tip badge.
     document.addEventListener('pointerdown', function (event) {
         if (!event.target.closest) {
             return;
         }
-        pendingTap = !!(event.target.closest('.search-overlay') || event.target.closest('#search-kbd'));
-        if (pendingTap) {
-            event.preventDefault();
-        }
-    });
-
-    document.addEventListener('pointerup', function () {
-        pendingTap = false;
-    });
-
-    document.addEventListener('focusout', function () {
-        var overlay = document.getElementById('search-overlay');
-        if (!overlay || !pendingTap) {
+        var overlay = event.target.closest('.search-overlay');
+        if (overlay) {
+            if (event.pointerType === 'mouse') {
+                event.preventDefault();
+            } else {
+                overlay.classList.add('tap-through');
+                setTimeout(function () {
+                    overlay.classList.remove('tap-through');
+                }, 350);
+            }
             return;
         }
-        overlay.classList.add('tap-through');
-        setTimeout(function () {
-            overlay.classList.remove('tap-through');
-        }, 350);
+        if (event.pointerType === 'mouse' && event.target.closest('#search-kbd')) {
+            event.preventDefault();
+        }
     });
 
     // click away from the overlay closes it even when the browser keeps focus on the input (Safari)

@@ -136,6 +136,35 @@ class RoutesTest {
     }
 
     @Test
+    void moviePageHasOpenGraphTagsForLinkPreviews() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/movies/348");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("property=\"og:title\" content=\"Alien (1979)\"");
+            assertThat(body).contains("property=\"og:description\" content=\"In space no one can hear you scream.\"");
+            // no backdrop in the fixture: og:image falls back to the poster
+            assertThat(body).contains("property=\"og:image\" content=\"https://img/poster.jpg\"");
+            assertThat(body).contains("property=\"og:type\" content=\"video.movie\"");
+            assertThat(body).contains("property=\"og:site_name\" content=\"ekran\"");
+            assertThat(body).contains("property=\"og:url\" content=\"http://");
+            assertThat(body).contains("/movies/348\"");
+        });
+    }
+
+    @Test
+    void pagesWithoutOpenGraphModelHaveNoOgTags() {
+        JavalinTest.test(app(), (server, http) -> {
+            for (var path : List.of("/", "/persons/1", "/about")) {
+                var body = http.get(path).body().string();
+                assertThat(body).doesNotContain("og:title");
+                assertThat(body).doesNotContain("og:description");
+            }
+        });
+    }
+
+    @Test
     void aboutPageRendersWithSearchBarAndAuthorLink() {
         JavalinTest.test(app(), (server, http) -> {
             var response = http.get("/about");
@@ -347,13 +376,15 @@ class RoutesTest {
             assertThat(body).contains("data-movie-id=\"348\"");
             assertThat(body).contains("data-card-mark=\"348\"");
             assertThat(body).contains("card-info-link");
-            assertThat(body).contains("data-list-title>Marked movies<");
+            assertThat(body).contains("<span data-list-title-text>Marked movies</span>");
             assertThat(body).contains("Directed by Ridley Scott");
             assertThat(body).contains("data-dialog=\"share\">Share</button>");
             assertThat(body).contains("data-print-list");
             assertThat(body).contains("data-mark-all");
             assertThat(body).contains("data-clear-marks");
+            assertThat(body).contains("data-list-title");
             assertThat(body).contains("data-list-name-edit");
+            assertThat(body).contains("data-list-name-input");
             assertThat(body).contains("<dialog id=\"share\">");
             assertThat(body).contains("data-qr-copy");
             assertThat(body).contains("1979");
@@ -374,7 +405,7 @@ class RoutesTest {
             var response = http.get("/list?movie=348&name=Sci-fi%20night&name=ignored");
 
             assertThat(response.code()).isEqualTo(200);
-            assertThat(response.body().string()).contains("data-list-title>Sci-fi night<");
+            assertThat(response.body().string()).contains("<span data-list-title-text>Sci-fi night</span>");
         });
     }
 
@@ -391,7 +422,7 @@ class RoutesTest {
             assertThat(response.code()).isEqualTo(200);
             var body = response.body().string();
             // escaped, never raw HTML; truncated to 60 chars (9 + 51 x's)
-            assertThat(body).contains("data-list-title>Night &lt;b&gt;" + "x".repeat(51) + "<");
+            assertThat(body).contains("<span data-list-title-text>Night &lt;b&gt;" + "x".repeat(51) + "</span>");
             assertThat(body).doesNotContain("Night <b>");
         });
     }
@@ -407,7 +438,7 @@ class RoutesTest {
             var response = http.get("/list?movie=348&name=%20");
 
             assertThat(response.code()).isEqualTo(200);
-            assertThat(response.body().string()).contains("data-list-title>Marked movies<");
+            assertThat(response.body().string()).contains("<span data-list-title-text>Marked movies</span>");
         });
     }
 
@@ -647,6 +678,16 @@ assertThat(body).contains("href=\"/movies/348\"");
             assertThat(body).contains("href=\"https://www.themoviedb.org/person/1\"");
             assertThat(body).contains("data-card-mark=\"348\"");
             assertThat(body).contains("not endorsed or certified by TMDB");
+        });
+    }
+
+    @Test
+    void personPageShowsBiography() {
+        JavalinTest.test(app(), (server, http) -> {
+            var body = http.get("/persons/1").body().string();
+
+            assertThat(body).contains("class=\"bio\"");
+            assertThat(body).contains("English filmmaker.");
         });
     }
 

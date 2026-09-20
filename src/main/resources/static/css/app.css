@@ -122,11 +122,19 @@ body {
     display: block;
 }
 
-.card-mark svg path {
+/* shared outline-icon base (bookmark toggles, list-name pencil); the filled
+   state (…marked svg path below) flips fill/stroke */
+.card-mark svg path,
+.mark-toggle svg path,
+.list-name-edit svg path {
     fill: none;
     stroke: currentColor;
     stroke-width: 1.4;
     stroke-linejoin: round;
+}
+
+.mark-toggle svg path {
+    stroke-width: 1.2;
 }
 
 .card-mark:hover,
@@ -220,7 +228,8 @@ body {
     font-size: 13px;
 }
 
-.result .meta span + span::before {
+.result .meta span + span::before,
+.meta-line span + span::before {
     content: "·";
     margin: 0 6px;
 }
@@ -356,6 +365,18 @@ body {
     flex: none;
 }
 
+/* clamped to ~2 lines (per docs): TMDB bios run long; full text stays
+   accessible to copy/AT, JS-free truncation */
+.bio {
+    margin: -8px 0 16px;
+    color: var(--muted);
+    font-size: 14px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
 .movie h2, .person h2 {
     margin: 0 0 4px;
 }
@@ -369,11 +390,6 @@ body {
 .meta-line {
     color: var(--muted);
     margin: 0;
-}
-
-.meta-line span + span::before {
-    content: "·";
-    margin: 0 6px;
 }
 
 .overview {
@@ -443,13 +459,6 @@ body {
     display: block;
 }
 
-.mark-toggle svg path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.2;
-    stroke-linejoin: round;
-}
-
 .mark-toggle:hover,
 .mark-toggle.marked {
     color: var(--accent);
@@ -505,14 +514,28 @@ body {
 
 dialog {
     width: min(720px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0;
-    overflow: hidden;
+    /* auto (not hidden) so long trailer lists scroll inside the dialog while the
+       page behind it is locked; still clips the edge-to-edge iframe to the
+       rounded corners. contain stops scroll chaining to the locked page */
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 dialog::backdrop {
     background: rgba(0, 0, 0, 0.5);
+}
+
+/* a modal <dialog> does not lock background scrolling: wheel/touch on the
+   backdrop still scrolls the page behind it — lock the document while any
+   dialog is open; covers the trailers and share dialogs alike */
+html:has(dialog[open]),
+html:has(dialog[open]) body {
+    overflow: hidden;
+    overscroll-behavior: none;
 }
 
 .dialog-head {
@@ -572,15 +595,35 @@ dialog::backdrop {
     font-size: 18px;
 }
 
+/* the title stays a plain title (no button look); both it and the pencil
+   start the rename — the pencil carries the visual affordance */
+.list-head h2[data-list-title] {
+    cursor: pointer;
+}
+
+/* pencil sits INSIDE the title, right after the name — a sibling flex item
+   would drift mid-row (.list-head is space-between). Hidden until the title
+   is hovered (or the pencil itself focused/pressed on touch) so the title
+   reads as plain text; visibility (not display) keeps its space reserved,
+   so nothing shifts when it appears */
 .list-name-edit {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 4px;
+    margin-left: 2px;
     border: none;
     background: none;
     color: var(--muted);
     cursor: pointer;
+    vertical-align: -2px;
+    visibility: hidden;
+}
+
+.list-head h2:hover .list-name-edit,
+.list-head h2:focus-within .list-name-edit,
+.list-name-edit:focus-visible {
+    visibility: visible;
 }
 
 .list-name-edit:hover,
@@ -588,18 +631,21 @@ dialog::backdrop {
     color: var(--accent);
 }
 
-.list-name-edit svg path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linejoin: round;
+/* touch has no hover — keep the affordance visible there */
+@media (pointer: coarse) {
+    .list-name-edit {
+        visibility: visible;
+    }
 }
 
+/* negative margins cancel the input's own border+padding so its text lands
+   exactly where the title text was — the rename starts in place, no jump */
 .list-name-input {
     font: inherit;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 700;
     padding: 2px 8px;
+    margin: -3px 0 -3px -9px;
     border: 1px solid var(--border);
     border-radius: 6px;
     outline: none;
@@ -895,10 +941,6 @@ kbd {
         break-inside: avoid;
     }
 
-    .marked-list .card-info-link {
-        display: block;
-    }
-
     .marked-list .card-info {
         display: flex;
         justify-content: space-between;
@@ -915,10 +957,5 @@ kbd {
 
     .marked-list .card-print-extra span {
         display: block;
-    }
-
-    .marked-list .card-meta span + span::before {
-        content: "·";
-        margin: 0 4px;
     }
 }

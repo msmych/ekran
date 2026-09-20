@@ -119,7 +119,12 @@
         var empty = cardIds.length === 0;
         var yours = empty || isOwnList();
         var name = urlName() || (yours && !empty ? storedName() : null);
-        title.textContent = name || (yours ? 'Marked movies' : 'Shared list');
+        // title.textContent would wipe the pencil (it lives inside the h2) —
+        // refresh only the text span
+        var titleText = title.querySelector('[data-list-title-text]');
+        if (titleText) {
+            titleText.textContent = name || (yours ? 'Marked movies' : 'Shared list');
+        }
         setHidden('[data-dialog="share"]', empty);
         setHidden('[data-print-list]', empty);
         setHidden('[data-mark-all]', empty || yours);
@@ -207,9 +212,12 @@
         if (!input || !title || !input.hidden) {
             return;
         }
+        // no point renaming an empty list (the old pencil button was hidden for it too)
+        if (visibleCardIds().length === 0) {
+            return;
+        }
         input.hidden = false;
         title.hidden = true;
-        setHidden('[data-list-name-edit]', true);
         input.value = urlName() || (isOwnList() ? storedName() : '') || '';
         input.focus();
         input.select();
@@ -311,8 +319,8 @@
             copyUrl(location.href);
             return;
         }
-        var nameEdit = event.target.closest('[data-list-name-edit]');
-        if (nameEdit) {
+        var titleEdit = event.target.closest && event.target.closest('[data-list-title]');
+        if (titleEdit) {
             startNameEdit();
             return;
         }

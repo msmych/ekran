@@ -52,10 +52,12 @@ Then open <http://localhost:7070>.
 |---|---|
 | `/` | Search-first homepage |
 | `/search?q={query}` | Movie search — full page, or results-only fragment for HTMX |
-| `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable; Trailers link opens a dialog with all videos) |
+| `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable; Trailers link opens a dialog with all videos; Open Graph tags power rich link previews — e.g. in Telegram) |
 | `/persons/{tmdbId}` | Person overview + filmography |
 | `/persons/{tmdbId}/{directing\|acting\|writing}` | Department filmography |
 | `/list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, no accounts; the Share chip opens a QR dialog with a copyable link |
+| `/list/card?movie={id}` | HTMX-only single-card fragment (used when marking from the search overlay while viewing `/list`) |
+| `/about` | About page |
 | `/videos/{key}` | HTMX-only YouTube player fragment (used by the movie page) |
 | `/health` `/healthz` | Health/readiness checks (no TMDB calls) |
 

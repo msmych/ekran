@@ -29,8 +29,8 @@ uk.matvey.ekran
 │   ├── SearchRoutes        — / and /search
 │   ├── MovieRoutes         — /movies/{id}
 │   ├── PersonRoutes        — /persons/{id}, /persons/{id}/{department}
-│   ├── viewmodels/         — SearchResultsVm, MovieDetailVm, PersonVm, FilmographyVm, …
-│   └── errors/             — exception handlers → friendly error fragments/pages
+│   ├── viewmodels/         — SearchResultsVm, MovieDetailVm, PersonPageVm, FilmographySectionVm, MovieCardVm, ResultItemVm, OgVm, …
+│   └── EkranApp            — app assembly, error handlers → friendly error fragments/pages
 ├── service/
 │   ├── SearchService       — query validation, movie search
 │   ├── MovieService        — movie detail assembly
@@ -105,7 +105,7 @@ Javalin with routes(services, thymeleaf)
 | JSON | Jackson (databind + jdk8/params-names as needed) | Required for TMDB responses |
 | Logging | SLF4J + Logback | Locked decision; simple console/file config, no ceremony |
 | Outbound HTTP | `java.net.http.HttpClient` | Zero extra dependency, supports connect timeout, connection reuse, and per-request timeouts |
-| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + one ~150-line first-party `search.js` (hotkeys, Escape, overlay close, keyboard result nav) | No blocking third-party assets; keyboard result nav deferred to a follow-up step |
+| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~220 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~450 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
 | Build | Gradle, `application` plugin | Locked decision |
 | Tests | JUnit 5, AssertJ, MockWebServer (OkHttp) or similar stub HTTP server | Mockable TMDB, no real API key |
 

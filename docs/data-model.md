@@ -34,8 +34,12 @@ record Movie(
     URI backdropUrl,            // nullable
     List<PersonLink> directors,
     List<PersonLink> writers,
-    List<PersonLink> cast       // principal, billing order
+    List<PersonLink> cast,      // principal, billing order
+    String originalLanguage,    // drives video ranking
+    List<MovieVideo> videos     // YouTube-only, filtered in the adapter
 ) {}
+
+record MovieVideo(String key, String name, String type, boolean official, String language, String publishedAt) {}
 
 record FilmographyItem(long movieTmdbId, String title, Integer year, URI posterUrl) {}
 

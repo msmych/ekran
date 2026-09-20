@@ -21,9 +21,12 @@ The input lives in a shared fragment (`searchbar.html`, `searchbar(live)`) rende
            th:attr="hx-target=${live} ? '#results' : '#search-overlay',
                     autofocus=${live} ? 'autofocus' : null">
     <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
+    <span class="search-kbd" id="search-kbd" aria-hidden="true">⌘K</span>
     <div id="search-overlay" class="search-overlay" th:if="${!live}"></div>
 </div>
 ```
+
+(The input also carries `th:value="${q}"` for the homepage deep-link `/?q=…`.)
 
 Two modes, one fragment — both are live search into a target; only the target and layout differ:
 
@@ -62,7 +65,7 @@ Focus restore after boosted swaps needs no JS: htmx focuses `[autofocus]` conten
 ## Mobile specifics
 
 - Mobile Safari/Chrome auto-zoom into inputs with a font-size below 16px, so `app.css` forces `#search-input` to 16px under `@media (pointer: coarse), (max-width: 640px)` (the rule is last in the file so it wins over the compact 14px site-search sizing).
-- Tapping a result in the overlay would otherwise never register as a click: on mobile the tap blurs the input *between* `pointerdown` and `click`, and the resulting `:focus-within` loss hides the panel — removing the link before the click lands. `search.js` therefore calls `preventDefault()` on `pointerdown` inside the results panel, keeping focus on the input until the click hits the link. Belt and braces for browsers that blur anyway (iOS Safari ignores `preventDefault` for that blur): the same handler arms a `pendingTap` flag (cleared on `pointerup`), and on `focusout` — if a tap is pending — a `.tap-through` class keeps the panel displayed for 350 ms, past the synthesized click. The class and flag are scoped to this race only; the panel still collapses on ordinary blur.
+- Tapping a result in the overlay would otherwise never register as a click: on mobile the tap blurs the input *between* `pointerdown` and `click`, and the resulting `:focus-within` loss hides the panel — removing the link before the click lands. `search.js` therefore arms a `.tap-through` class at `pointerdown` inside the results panel — before any blur can fire — keeping the panel displayed for 350 ms, past the synthesized click. It deliberately does **not** `preventDefault()` the touch `pointerdown`: on touch browsers canceling it suppresses the synthesized click entirely, so the tap never navigates (the earlier mechanism relied on that and broke all overlay-page taps on mobile). With a mouse, `preventDefault()` on `pointerdown` (results panel and the `⌘K` badge) still keeps the focus on the input, and mouse clicks fire regardless. The grace window is scoped to this race only; the panel still collapses on ordinary blur.
 
 ## Input rules
 

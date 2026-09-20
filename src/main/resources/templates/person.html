@@ -16,6 +16,7 @@
                 </p>
             </div>
         </header>
+        <p class="bio" th:if="${vm.biography() != null}" th:text="${vm.biography()}">Biography</p>
         <nav class="tabs">
             <a th:href="${'/persons/' + vm.tmdbId()}"
                th:classappend="${vm.currentDepartment() == null} ? current"

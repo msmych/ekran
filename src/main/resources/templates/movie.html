@@ -32,9 +32,7 @@
                             aria-label="Mark movie (m)"
                             aria-pressed="false"
                             th:attr="data-movie-id=${vm.tmdbId()}">
-                        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-                            <path d="M3.5 1.5h9a1 1 0 0 1 1 1v12l-5.5-3.7L2.5 14.5v-12a1 1 0 0 1 1-1z"/>
-                        </svg>
+                        <th:block th:replace="~{bookmark-icon :: icon(18)}"></th:block>
                     </button>
                 </div>
             </div>

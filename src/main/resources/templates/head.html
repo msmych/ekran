@@ -6,6 +6,17 @@
     <meta name="htmx-config"
           content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"404","swap":true},{"code":"503","swap":true},{"code":"[45]..","swap":false,"error":true},{"code":"default","swap":false}]}'>
     <title th:text="${title}">ekran</title>
+    <!-- Open Graph link previews (Telegram, iMessage, etc.); pages opt in by
+         putting an `og` view model into the render model. Telegram fetches the
+         URL server-side and never runs JS, so these must be fully server-rendered -->
+    <th:block th:if="${og != null}">
+        <meta property="og:title" th:content="${og.title()}">
+        <meta property="og:description" th:if="${og.description() != null}" th:content="${og.description()}">
+        <meta property="og:image" th:if="${og.image() != null}" th:content="${og.image()}">
+        <meta property="og:type" th:content="${og.type()}">
+        <meta property="og:site_name" th:content="${og.siteName()}">
+        <meta property="og:url" th:content="${og.url()}">
+    </th:block>
     <link rel="icon" href="/favicons/favicon.ico" sizes="32x32">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">

@@ -45,7 +45,7 @@ Rule: friendly application-level errors, never raw TMDB/internal exceptions in r
 ./gradlew check
 ```
 
-Packaging via the Gradle `application` plugin (`./gradlew installDist` / `build`); a Dockerfile is **not** MVP scope but nothing in the design precludes it.
+Packaging via the Gradle `application` plugin (`./gradlew installDist` / `build`) and a multi-stage Dockerfile (see `Deployment` and the repo root `Dockerfile`).
 
 ## Operational posture
 
