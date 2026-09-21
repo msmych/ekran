@@ -6,7 +6,7 @@
         <input type="search"
                id="search-input"
                name="q"
-               placeholder="Search movies…"
+               th:placeholder="${live and personSearch} ? 'Search people…' : 'Search movies…'"
                th:value="${q}"
                autocomplete="off"
                spellcheck="false"
@@ -15,9 +15,23 @@
                hx-sync="this: replace"
                hx-indicator="#search-indicator"
                th:attr="hx-target=${live} ? '#results' : '#search-overlay',
+                        hx-include=${live} ? '#search-type',
                         autofocus=${live} ? 'autofocus' : null">
         <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
-        <span class="search-kbd" id="search-kbd" aria-hidden="true">⌘K</span>
+        <!-- Cmd+K tip only on the compact overlay search — the home input is
+             already focused and prominent, there is nothing to advertise -->
+        <span class="search-kbd" id="search-kbd" aria-hidden="true" th:if="${!live}">⌘K</span>
+        <!-- movies/people toggle: search.js flips the hidden input's value, re-applies the
+             active state and re-fires the search through the input's `search` trigger -->
+        <input type="hidden" id="search-type" name="type"
+               th:if="${live}"
+               th:value="${personSearch} ? 'person' : ''">
+        <div class="search-toggle" th:if="${live}">
+            <button type="button" data-search-type=""
+                    th:classappend="${!personSearch} ? 'active'">Movies</button>
+            <button type="button" data-search-type="person"
+                    th:classappend="${personSearch} ? 'active'">People</button>
+        </div>
         <div id="search-overlay" class="search-overlay" th:if="${!live}"></div>
     </div>
 </th:block>

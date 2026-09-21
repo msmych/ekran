@@ -9,7 +9,7 @@ enum Department { DIRECTING, ACTING, WRITING, OTHER }   // known_for_department 
 
 record SearchResult(
     long tmdbId,
-    SearchType type,            // MOVIE | PERSON — only MOVIE produced in Step 1
+    SearchType type,            // MOVIE | PERSON — search type from the home toggle / `type` param
     String title,               // movie title or person name
     String originalTitle,       // raw from TMDB; display layer hides it when same as title
     Integer year,               // release year, nullable
@@ -53,7 +53,8 @@ record Person(
     long tmdbId,
     String name,
     Department knownFor,
-    String biography,           // nullable / short
+    LocalDate born,             // nullable — birthday
+    LocalDate died,            // nullable — deathday
     URI profileUrl,            // nullable
     Filmography filmography
 ) {}

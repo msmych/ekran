@@ -28,6 +28,8 @@ import uk.matvey.ekran.tmdb.dto.MovieSearchItem;
 import uk.matvey.ekran.tmdb.dto.MovieSearchResponse;
 import uk.matvey.ekran.tmdb.dto.PersonDetailResponse;
 import uk.matvey.ekran.tmdb.dto.PersonMovieCreditsResponse;
+import uk.matvey.ekran.tmdb.dto.PersonSearchItem;
+import uk.matvey.ekran.tmdb.dto.PersonSearchResponse;
 
 public class TmdbMapper {
 
@@ -40,11 +42,11 @@ public class TmdbMapper {
     }
 
     public SearchResultPage toSearchResults(MovieSearchResponse response) {
-        if (response == null) {
-            return new SearchResultPage(List.of());
-        }
-        var items = orEmpty(response.results());
-        return new SearchResultPage(items.stream().map(this::toSearchResult).toList());
+        return new SearchResultPage(orEmpty(response.results()).stream().map(this::toSearchResult).toList());
+    }
+
+    public SearchResultPage toPersonSearchResults(PersonSearchResponse response) {
+        return new SearchResultPage(orEmpty(response.results()).stream().map(this::toPersonSearchResult).toList());
     }
 
     public Movie toMovie(MovieDetailResponse response) {
@@ -96,7 +98,8 @@ public class TmdbMapper {
             response.id(),
             response.name(),
             Department.fromTmdb(response.knownForDepartment()),
-            response.biography(),
+            localDate(response.birthday()),
+            localDate(response.deathday()),
             imageUrl("h632", response.profilePath()),
             new Filmography(
                 filmography(crew, "Directing"),
@@ -115,6 +118,18 @@ public class TmdbMapper {
             year(item.releaseDate()),
             ratingSubtitle(item.voteAverage()),
             imageUrl("w92", item.posterPath())
+        );
+    }
+
+    private SearchResult toPersonSearchResult(PersonSearchItem item) {
+        return new SearchResult(
+            item.id(),
+            SearchType.PERSON,
+            item.name(),
+            null,
+            null,
+            Department.fromTmdb(item.knownForDepartment()).displayName(),
+            imageUrl("w92", item.profilePath())
         );
     }
 

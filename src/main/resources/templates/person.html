@@ -11,12 +11,12 @@
             <div>
                 <h2 th:text="${vm.name()}">Name</h2>
                 <p class="known-for" th:if="${vm.knownFor() != null}" th:text="'Known for ' + ${vm.knownFor()}">Known for Directing</p>
+                <p class="life-dates" th:if="${vm.lifeDates() != null}" th:text="${vm.lifeDates()}">Born November 30, 1937</p>
                 <p class="external-links">
                     <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
                 </p>
             </div>
         </header>
-        <p class="bio" th:if="${vm.biography() != null}" th:text="${vm.biography()}">Biography</p>
         <nav class="tabs">
             <a th:href="${'/persons/' + vm.tmdbId()}"
                th:classappend="${vm.currentDepartment() == null} ? current"

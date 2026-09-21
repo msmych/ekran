@@ -58,6 +58,21 @@ class TmdbClientTest {
     }
 
     @Test
+    void sendsPersonSearchQueryParams() throws Exception {
+        server.enqueue(new MockResponse().setBody("""
+            {"page": 1, "results": [{"id": 1, "name": "Ridley Scott"}]}
+            """));
+
+        var response = client.searchPersons("ridley", 1);
+
+        var recorded = server.takeRequest();
+        assertThat(recorded.getPath())
+            .isEqualTo("/3/search/person?query=ridley&include_adult=false&page=1");
+        assertThat(recorded.getHeader("Authorization")).isEqualTo("Bearer secret-token");
+        assertThat(response.results()).hasSize(1);
+    }
+
+    @Test
     void appendsCreditsAndLanguageForMovieDetail() throws Exception {
         server.enqueue(new MockResponse().setBody("""
             {"id": 348, "title": "Alien", "credits": {"crew": [], "cast": []}}

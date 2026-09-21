@@ -23,10 +23,10 @@ This is **not** a Letterboxd/IMDb replacement. No social layer, reviews, feeds, 
 | Root package | `uk.matvey.ekran` |
 | Web framework | Javalin (no Spring) |
 | Template engine | Thymeleaf (server-side rendering) |
-| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~220 lines, `marked.js` ~450 lines), basic no-frills UI in Step 1 |
+| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~280 lines, `marked.js` ~450 lines), basic no-frills UI in Step 1 |
 | Search from any page | Search bar on every page: live in-page on the homepage, compact overlay panel (Wikipedia-style) elsewhere; `/` and Cmd/Ctrl+K focus it from anywhere |
 | TMDB auth | v4 Bearer token (`Authorization: Bearer …`), env var only |
-| Search scope | **Movies only** in Step 1; persons search is a follow-up step |
+| Search scope | Movies by default; a home Movies/People toggle switches to person search (`type=person`) |
 | Route naming | Plural resources: `/movies/{id}`, `/persons/{id}` |
 | Logging | SLF4J + Logback |
 | Persistence | None in MVP (repository abstraction only) |
@@ -58,10 +58,9 @@ The user can go from an empty browser tab to the relevant movie/person informati
 
 ## Deferred to a follow-up step (explicitly out of Step 1)
 
-- **Persons in search results** — the search box returns movies only; we'll design how to blend people into results (or a separate persons search) as the next step. Person pages/filmographies remain in scope and are reachable from movie pages.
 - **UI polish** — deliberately basic UI in Step 1; visual direction to be figured out later.
 
-Keyboard result navigation (`↓`/`↑`/`Ctrl N`/`Ctrl P` + `Enter` to open) was originally deferred but has since been implemented — see `search-interaction.md`.
+Persons in search results was originally deferred but has since been implemented (a separate persons search mode — the home Movies/People toggle, `type=person`). Keyboard result navigation (`↓`/`↑`/`Ctrl N`/`Ctrl P` + `Enter` to open) was also originally deferred but is implemented — see `search-interaction.md`.
 
 ## Step 2 direction (not MVP work)
 

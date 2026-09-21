@@ -4,15 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import java.util.List;
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record PersonDetailResponse(
-    long id,
-    String name,
-    String knownForDepartment,
-    String birthday,
-    String deathday,
-    String profilePath,
-    PersonMovieCreditsResponse movieCredits
+public record PersonSearchResponse(
+    int page,
+    List<PersonSearchItem> results
 ) {
 }

@@ -18,7 +18,7 @@
 
 All pages are server-rendered by Thymeleaf. No client-side routing.
 
-Naming rationale: resource routes are plural (`/movies/{id}`, `/persons/{id}`); `/search` stays a single generic path so blending in persons results later (follow-up step) does not break URLs.
+Naming rationale: resource routes are plural (`/movies/{id}`, `/persons/{id}`); `/search` stays a single generic path — the `type` parameter carries the movie/person distinction without breaking URLs.
 
 **UI direction:** deliberately basic in Step 1 — clean typography, minimal CSS, no design system, no polish. We'll figure out the visual direction later; do not invest in it now.
 
@@ -29,7 +29,7 @@ Naming rationale: resource routes are plural (`/movies/{id}`, `/persons/{id}`); 
 - The same Thymeleaf fragment that renders results on `/search` is embedded empty on `/` and filled by HTMX.
 - With `?q=`, the homepage renders the query pre-filled plus results (deep-linkable `/?q=alien`). Always a full page — even for HTMX requests — because it is the swap target for boosted navigation.
 
-## `/search?q={query}` — dual-mode response
+## `/search?q={query}&type={movie|person}` — dual-mode response
 
 The route inspects the `HX-Request` header:
 
@@ -42,13 +42,14 @@ Edge cases:
 - Query length: trim; treat queries longer than ~100 chars as invalid → empty result state, not an error.
 - Pagination is **not** in the MVP: return the first result page only (TMDB default page size is 20 movies). Design note: do not add "load more" now, but keep `SearchResultPage` shaped so a page token could be added later.
 
-### Result item (movies only in Step 1)
+### Result item
 
 Compact row, in TMDB relevance order:
 
-- **Movie row:** poster thumbnail (w92), title, original title (shown under the title, muted — only when it differs from the title; useful when searching by a foreign-language title), release year, rating as subtitle (the movie search response carries no cast/crew or genre names — `vote_average` is the free high-value field). Links to `/movies/{id}`. Every movie row carries the card bookmark toggle (`data-card-mark`, `ResultItemVm.tmdbId` — null for future person results, which render no toggle), so movies can be marked straight from the results.
+- **Movie row:** poster thumbnail (w92), title, original title (shown under the title, muted — only when it differs from the title; useful when searching by a foreign-language title), release year, rating as subtitle (the movie search response carries no cast/crew or genre names — `vote_average` is the free high-value field). Links to `/movies/{id}`. Every movie row carries the card bookmark toggle (`data-card-mark`, `ResultItemVm.tmdbId`), so movies can be marked straight from the results.
+- **Person row** (`type=person`): profile thumbnail (w92), name, known-for department as subtitle (`Department.fromTmdb` display name, e.g. "Directing"; "Other" for anything unmapped). Links to `/persons/{id}`. No mark toggle (`tmdbId` is null — marking is movie-only).
 
-Persons will join the result list in a follow-up step; the domain's `SearchType` marker flows through to `ResultItemVm` (movie results carry `tmdbId` for the mark toggle, person results will carry null) so that addition does not reshape `SearchResultsVm`.
+The homepage carries a tiny Movies/People pill toggle under the search input (`search-toggle`); it flips the hidden `#search-type` value that the input's requests include via `hx-include`, and `search.js` re-fires the search through the input's bare `search` trigger (no `changed` gate, so it runs even though the query didn't change). The state deep-links via `/?q=…&type=person` / `/search?q=…&type=person`. The header overlay search stays movie-only — movies are the focus; people are reachable from movie pages and the home toggle.
 
 Keyboard result navigation: `↓`/`↑` (or `Ctrl N`/`Ctrl P`) move a highlight through results while the search input has focus; `Enter` opens the highlighted result, and without a highlight it fires an immediate HTMX search via the `search`-event trigger. Handled in `search.js` — see `search-interaction.md`.
 
@@ -110,7 +111,8 @@ One TMDB call (`/person/{id}` with `append_to_response=movie_credits` — see `t
 Layout:
 
 - Name, known-for department (e.g. "Known for Directing").
-- Optional short biography if present in the response — clamped to ~2 lines via CSS `line-clamp` (`.bio` in `app.css`), no truncation JS; the full text stays in the DOM.
+- Life dates when TMDB has them: "Born November 30, 1937" for living people, "August 28, 1925 – September 27, 2003" for deceased (`PersonPageVm.lifeDates`, full month names, en dash).
+- No biography: person pages are for the filmography, the bio text was noise; TMDB has it, we deliberately drop it.
 - Filmography — grouped sections by department, each rendered as the shared movie-card grid (`movie-card.html`, same cards as `/list`, minus the remove action): poster, title, year — and no role line (the section heading already says Directing/Writing/Acting, and repeating `Director` on every card was noise). Duration is deliberately not shown: TMDB's person-credits payload has no `runtime`, and fetching it per credit would cost one detail call per movie (a busy person = 50–100+ calls per page, against the one-call-per-page rule).
 - Filmography lists are sorted by release year descending; undated items go last. Duplicate movies across departments stay in each relevant section.
 - Every movie title links to `/movies/{id}`.
@@ -127,9 +129,9 @@ Layout:
 
 Templates never receive domain models with TMDB-shaped leftovers. `web/viewmodels` provides:
 
-- `SearchResultsVm` — `query`, `List<ResultItemVm>` (title, `originalTitle` nulled by the view model when same-as/blank, subtitle, year, imageUrl, href; `tmdbId` null ⇒ person ⇒ no mark toggle); only `MOVIE` is produced in Step 1.
+- `SearchResultsVm` — `query`, `List<ResultItemVm>` (title, `originalTitle` nulled by the view model when same-as/blank, subtitle, year, imageUrl, href; `tmdbId` null ⇒ person ⇒ no mark toggle); produced for both `MOVIE` and `PERSON` search types (`type` query param, home toggle).
 - `MovieDetailVm` — preformatted fields (runtime as `1h 52m`, rating as string, joined genres, resolved poster/backdrop URLs, `List<PersonLinkVm> directors/writers/cast` with `name, role, href`), plus `List<VideoVm> videos` (`key, name, type`) ranked best-first by `rankVideos` (see `/movies/{tmdbId}`), so templates stay logic-free.
-- `PersonPageVm` — name, knownFor, bio, filmography sections of `MovieCardVm`s, current department for tab highlighting.
+- `PersonPageVm` — name, knownFor, lifeDates (formatted birth/death dates), filmography sections of `MovieCardVm`s, current department for tab highlighting.
 - `MovieCardVm` — the one shared card shape (`tmdbId, title, year, meta, originalTitle, directors, posterUrl`) with two factories: `of(Movie)` for `/list` (meta = formatted duration, directors joined, original title for the print sub-line) and `of(FilmographyItem)` for person filmography grids (meta/originalTitle/directors = null — see the runtime note there); `MovieDetailVm` carries its own `tmdbId` for the mark button's `data-movie-id`.
 
 All image URLs are absolute (resolved in the tmdb adapter) — templates contain no TMDB URL-construction logic.
@@ -155,10 +157,10 @@ Served from `src/main/resources/static/`:
 - **Cache policy:** every response — rendered pages and static assets — is served with `Cache-Control: no-cache` (always revalidate, cheap 304s via ETag). Explicit revalidation is required: Javalin/Jetty's default static header is `max-age=0` paired with a fake 1980 `Last-Modified`, and browsers (notably Safari) then apply heuristic caching that serves stale JS long after a deploy — a stale `search.js` against fresh markup breaks the trailers dialog and the mobile overlay-tap fix (symptoms seen in production: the Trailers link navigating to YouTube, overlay taps not following links).
 - `/css/app.css` — single lightweight local stylesheet, no framework, basic system font stack. No design polish in Step 1.
 - `/js/htmx.min.js` — vendored HTMX (see `search-interaction.md` for version pinning).
-- `/js/search.js` — first-party JS (~220 lines: hotkeys, Escape, overlay close, mobile tap-through grace, keyboard result navigation, native-dialog handling, video-list selection).
+- `/js/search.js` — first-party JS (~280 lines: hotkeys, Escape, overlay close, mobile tap completion, keyboard result navigation, movies/people toggle, native-dialog handling, video-list selection).
 - `/js/marked.js` — marking/list client (~450 lines: localStorage store, mark toggles on the movie page/cards/search results, marked count/link, `/list` title + custom name + bulk actions, confirmed clear, share dialog, QR render, URL sync, print), loaded (deferred) on every page.
 - `/js/qrcode.js` — vendored `qrcode-generator` 1.4.4 (kazuhikoarase, MIT; auto type, SVG output), loaded only by `/list`.
 - `/favicons/` — vendored favicon set (ico + PNG sizes + webmanifest); linked from the shared `head` fragment.
 - `/img/tmdb-logo.svg` — vendored TMDB logo for the attribution footer.
 
-No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus two small first-party files, `/js/search.js` (~220 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result navigation, native-dialog open/close, video-list selection) and `/js/marked.js` (~450 lines: mark storage/toggle everywhere, marked-link sync, list title/custom name/bulk actions, confirmed clear, share dialog, print), plus the QR library on `/list` only. Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.
+No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus two small first-party files, `/js/search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap completion, keyboard result navigation, movies/people toggle, native-dialog open/close, video-list selection) and `/js/marked.js` (~450 lines: mark storage/toggle everywhere, marked-link sync, list title/custom name/bulk actions, confirmed clear, share dialog, print), plus the QR library on `/list` only. Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.

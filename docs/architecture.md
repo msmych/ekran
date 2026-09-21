@@ -68,7 +68,7 @@ Deliberately minimal — the smallest surface the UI needs today:
 
 ```java
 public interface SearchRepository {
-    SearchResultPage search(String query, int page);   // movies only in Step 1
+    SearchResultPage search(String query, int page, SearchType type);   // MOVIE | PERSON
 }
 
 public interface MovieRepository {
@@ -80,7 +80,7 @@ public interface PersonRepository {
 }
 ```
 
-`SearchResultPage` carries domain `SearchResult` items (see `data-model.md`). In Step 1 the search is **movies only** — one TMDB call per search. When persons search is added as the follow-up step, options are blending in the adapter (two parallel TMDB calls merged deterministically) or a later PostgreSQL-backed merge — `SearchService` and the routes should not need to change shape.
+`SearchResultPage` carries domain `SearchResult` items (see `data-model.md`). Search takes a type (movie or person — the home Movies/People toggle, `type=person` deep links) and costs exactly one TMDB call per search. If movies and persons ever need to be blended into one result list, the adapter can merge two parallel TMDB calls deterministically, or a later PostgreSQL-backed merge can do it — `SearchService` and the routes should not need to change shape.
 
 ## Wiring
 
@@ -105,7 +105,7 @@ Javalin with routes(services, thymeleaf)
 | JSON | Jackson (databind + jdk8/params-names as needed) | Required for TMDB responses |
 | Logging | SLF4J + Logback | Locked decision; simple console/file config, no ceremony |
 | Outbound HTTP | `java.net.http.HttpClient` | Zero extra dependency, supports connect timeout, connection reuse, and per-request timeouts |
-| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~220 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~450 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
+| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~450 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
 | Build | Gradle, `application` plugin | Locked decision |
 | Tests | JUnit 5, AssertJ, MockWebServer (OkHttp) or similar stub HTTP server | Mockable TMDB, no real API key |
 

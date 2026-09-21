@@ -9,7 +9,7 @@ Principles: fast tests, no network, no real API key, boring tools (JUnit 5 + Ass
 - Missing/null fields → nulls in domain, no exceptions (absent overview, no poster, null runtime).
 - Malformed date, unknown genre set, empty credits.
 - `known_for_department` → `Department` enum mapping incl. "Production" → OTHER.
-- Search DTOs → `SearchResult` list (`MOVIE` type only in Step 1), TMDB relevance order preserved.
+- Search DTOs → `SearchResult` list (movie and person search types), TMDB relevance order preserved.
 
 ### Services
 - `SearchService`: blank/whitespace query → empty; trimming; oversized query → empty; repository failure → typed error surfaced; success path passes results through with correct VM shape.

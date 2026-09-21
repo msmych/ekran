@@ -6,6 +6,11 @@
         return document.getElementById('search-input');
     }
 
+    // event.target may be a non-Element (document, text node); guard once here
+    function up(target, selector) {
+        return target && target.closest ? target.closest(selector) : null;
+    }
+
     function results() {
         var i = input();
         if (!i) {
@@ -107,41 +112,100 @@
 
     // mobile: tapping a result blurs the input between `pointerdown` and the
     // synthesized `click`, and the `:focus-within` loss would hide the panel —
-    // removing the link before the click lands. Preventing `pointerdown` keeps the
-    // focus on desktop, but on touch browsers it also suppresses the synthesized
-    // click entirely (the tap never navigates), so for touch the panel instead gets
-    // a short `.tap-through` grace window armed at `pointerdown` — before any blur —
-    // keeping it on screen long enough for the click to land on the result.
-    // With a mouse, preventDefault keeps the focus on the input (clicks still fire);
-    // same for the Cmd+K tip badge.
+    // removing the link before the click lands. Worse, iOS Safari with the
+    // keyboard up swallows the first tap entirely: it only dismisses the
+    // keyboard and never synthesizes the click, so no panel grace window can
+    // save it. The tap is therefore completed manually: `pointerdown` arms the
+    // `.tap-through` window (keeps the panel visible past the blur), and
+    // `pointerup` on a result fires the click right away — `pointerup` is always
+    // delivered, unlike the click. The click the browser may still synthesize
+    // afterwards is swallowed in the capture-phase listener below, so the
+    // htmx-boosted navigation (and its history entry) fires exactly once.
+    // A pointer that moved more than a few pixels is a scroll gesture, not a
+    // tap — the overlay scrolls, no click fires.
+    // With a mouse, preventDefault keeps the focus on the input (clicks still
+    // fire); same for the Cmd+K tip badge.
+    var tapStart = null;
+    var suppressOverlayClickUntil = 0;
+
     document.addEventListener('pointerdown', function (event) {
-        if (!event.target.closest) {
-            return;
-        }
-        var overlay = event.target.closest('.search-overlay');
+        var overlay = up(event.target, '.search-overlay');
         if (overlay) {
             if (event.pointerType === 'mouse') {
                 event.preventDefault();
             } else {
+                tapStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
                 overlay.classList.add('tap-through');
                 setTimeout(function () {
                     overlay.classList.remove('tap-through');
-                }, 350);
+                }, 500);
             }
             return;
         }
-        if (event.pointerType === 'mouse' && event.target.closest('#search-kbd')) {
+        if (event.pointerType === 'mouse' && up(event.target, '#search-kbd')) {
             event.preventDefault();
         }
     });
 
-    // click away from the overlay closes it even when the browser keeps focus on the input (Safari)
+    document.addEventListener('pointerup', function (event) {
+        if (!tapStart || event.pointerId !== tapStart.id) {
+            return;
+        }
+        var start = tapStart;
+        tapStart = null;
+        var tapped = up(event.target, 'a, button');
+        if (!tapped || !up(tapped, '.search-overlay')) {
+            return;
+        }
+        var moved = Math.abs(event.clientX - start.x) > 8 || Math.abs(event.clientY - start.y) > 8;
+        if (!moved) {
+            tapped.click();
+            suppressOverlayClickUntil = Date.now() + 500;
+        }
+    });
+
+    document.addEventListener('pointercancel', function (event) {
+        if (tapStart && event.pointerId === tapStart.id) {
+            tapStart = null;
+        }
+    });
+
+    // swallow the click the browser may still synthesize after the manual one;
+    // capture phase so it never reaches htmx or the other click handlers
+    document.addEventListener('click', function (event) {
+        if (Date.now() < suppressOverlayClickUntil && event.isTrusted && up(event.target, '.search-overlay')) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, true);
+
+    // search-bar clicks: movies/people toggle, Cmd+K tip focus, click-away close
+    // (closes the overlay even when the browser keeps focus on the input — Safari)
     document.addEventListener('click', function (event) {
         var i = input();
         if (!i) {
             return;
         }
-        if (event.target.closest && event.target.closest('#search-kbd')) {
+        var toggle = up(event.target, '[data-search-type]');
+        if (toggle && i.parentElement.contains(toggle)) {
+            var hidden = document.getElementById('search-type');
+            var type = toggle.getAttribute('data-search-type') || '';
+            if (!hidden || hidden.value === type) {
+                return;
+            }
+            hidden.value = type;
+            i.parentElement.querySelectorAll('[data-search-type]').forEach(function (button) {
+                button.classList.toggle('active', button === toggle);
+            });
+            i.placeholder = type === 'person' ? 'Search people\u2026' : 'Search movies\u2026';
+            if (i.value.trim()) {
+                // re-fire through the bare `search` trigger: no `changed` gate,
+                // so it runs even though the query itself did not change
+                i.dispatchEvent(new Event('search', { bubbles: true }));
+            }
+            return;
+        }
+        if (up(event.target, '#search-kbd')) {
             i.focus();
             return;
         }
@@ -163,7 +227,7 @@
     }
 
     document.addEventListener('click', function (event) {
-        var video = event.target.closest('.video-list a');
+        var video = up(event.target, '.video-list a');
         if (video) {
             var list = video.closest('.video-list');
             var items = list.querySelectorAll('li');
@@ -173,7 +237,7 @@
             video.closest('li').classList.add('selected');
             return;
         }
-        var opener = event.target.closest('[data-dialog]');
+        var opener = up(event.target, '[data-dialog]');
         if (opener) {
             event.preventDefault();
             var dialog = document.getElementById(opener.getAttribute('data-dialog'));
@@ -188,7 +252,7 @@
             }
             return;
         }
-        var closer = event.target.closest('[data-dialog-close]');
+        var closer = up(event.target, '[data-dialog-close]');
         if (closer) {
             var dialogToClose = closer.closest('dialog');
             if (dialogToClose) {

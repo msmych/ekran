@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Test;
 
 import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.domain.Department;
+import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.tmdb.dto.MovieDetailResponse;
 import uk.matvey.ekran.tmdb.dto.MovieSearchResponse;
 import uk.matvey.ekran.tmdb.dto.PersonDetailResponse;
+import uk.matvey.ekran.tmdb.dto.PersonSearchResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,6 +57,39 @@ class TmdbMapperTest {
         var third = page.results().get(2);
         assertThat(third.title()).isEqualTo("Wings of Desire");
         assertThat(third.originalTitle()).isEqualTo("Der Himmel über Berlin");
+    }
+
+    @Test
+    void mapsPersonSearchResults() throws Exception {
+        var response = objectMapper.readValue("""
+            {
+              "page": 1,
+              "results": [
+                {"id": 1, "name": "Ridley Scott", "profile_path": "/scott.jpg", "known_for_department": "Directing"},
+                {"id": 2, "name": "Sigourney Weaver", "profile_path": null, "known_for_department": "Acting"},
+                {"id": 3, "name": "Unknown Crew", "known_for_department": "Production"}
+              ]
+            }
+            """, PersonSearchResponse.class);
+
+        var page = mapper.toPersonSearchResults(response);
+
+        assertThat(page.results()).hasSize(3);
+        var first = page.results().get(0);
+        assertThat(first.type()).isEqualTo(SearchType.PERSON);
+        assertThat(first.tmdbId()).isEqualTo(1);
+        assertThat(first.title()).isEqualTo("Ridley Scott");
+        assertThat(first.originalTitle()).isNull();
+        assertThat(first.year()).isNull();
+        assertThat(first.subtitle()).isEqualTo("Directing");
+        assertThat(first.thumbUrl()).hasToString("https://image.tmdb.org/t/p/w92/scott.jpg");
+
+        var second = page.results().get(1);
+        assertThat(second.subtitle()).isEqualTo("Acting");
+        assertThat(second.thumbUrl()).isNull();
+
+        var third = page.results().get(2);
+        assertThat(third.subtitle()).isEqualTo("Other");
     }
 
     @Test
@@ -163,7 +198,7 @@ class TmdbMapperTest {
         var response = objectMapper.readValue("""
             {
               "id": 1, "name": "Ridley Scott", "known_for_department": "Directing",
-              "biography": "bio", "profile_path": "/r.jpg",
+              "profile_path": "/r.jpg", "birthday": "1937-11-30",
               "movie_credits": {
                 "crew": [
                   {"id": 348, "title": "Alien", "job": "Director", "department": "Directing", "release_date": "1979-05-25"},
@@ -182,6 +217,8 @@ class TmdbMapperTest {
 
         assertThat(person.name()).isEqualTo("Ridley Scott");
         assertThat(person.knownFor()).isEqualTo(Department.DIRECTING);
+        assertThat(person.born()).isEqualTo("1937-11-30");
+        assertThat(person.died()).isNull();
         assertThat(person.profileUrl()).hasToString("https://image.tmdb.org/t/p/h632/r.jpg");
         assertThat(person.filmography().directing())
             .extracting(f -> f.title() + ":" + f.year())
@@ -204,16 +241,24 @@ class TmdbMapperTest {
     }
 
     @Test
+    void mapsBirthAndDeathDates() throws Exception {
+        var response = objectMapper.readValue("""
+            {"id": 3, "name": "Old Actor", "birthday": "1925-08-28", "deathday": "2003-09-27",
+             "known_for_department": "Acting"}
+            """, PersonDetailResponse.class);
+
+        var person = mapper.toPerson(response);
+
+        assertThat(person.born()).isEqualTo(java.time.LocalDate.parse("1925-08-28"));
+        assertThat(person.died()).isEqualTo(java.time.LocalDate.parse("2003-09-27"));
+    }
+
+    @Test
     void toleratesMalformedDates() throws Exception {
         var response = objectMapper.readValue("""
             {"id": 5, "title": "Broken", "release_date": "not-a-date", "credits": {"crew": [], "cast": []}}
             """, MovieDetailResponse.class);
 
         assertThat(mapper.toMovie(response).releaseDate()).isNull();
-    }
-
-    @Test
-    void mapsNullSearchResponseToEmptyPage() {
-        assertThat(mapper.toSearchResults(null).results()).isEmpty();
     }
 }

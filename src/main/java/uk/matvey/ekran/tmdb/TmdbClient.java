@@ -22,6 +22,7 @@ import uk.matvey.ekran.domain.TmdbUnavailableException;
 import uk.matvey.ekran.tmdb.dto.MovieDetailResponse;
 import uk.matvey.ekran.tmdb.dto.MovieSearchResponse;
 import uk.matvey.ekran.tmdb.dto.PersonDetailResponse;
+import uk.matvey.ekran.tmdb.dto.PersonSearchResponse;
 
 public class TmdbClient {
 
@@ -40,11 +41,19 @@ public class TmdbClient {
     }
 
     public MovieSearchResponse searchMovies(String query, int page) {
+        return search("/search/movie", query, page, MovieSearchResponse.class);
+    }
+
+    public PersonSearchResponse searchPersons(String query, int page) {
+        return search("/search/person", query, page, PersonSearchResponse.class);
+    }
+
+    private <T> T search(String path, String query, int page, Class<T> type) {
         var params = new LinkedHashMap<String, String>();
         params.put("query", query);
         params.put("include_adult", "false");
         params.put("page", String.valueOf(page));
-        return get("/search/movie", params, MovieSearchResponse.class, config.searchTimeout());
+        return get(path, params, type, config.searchTimeout());
     }
 
     public MovieDetailResponse movieWithCredits(long tmdbId) {

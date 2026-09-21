@@ -6,13 +6,10 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record PersonDetailResponse(
+public record PersonSearchItem(
     long id,
     String name,
-    String knownForDepartment,
-    String birthday,
-    String deathday,
     String profilePath,
-    PersonMovieCreditsResponse movieCredits
+    String knownForDepartment
 ) {
 }

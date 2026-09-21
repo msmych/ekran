@@ -1,6 +1,9 @@
 package uk.matvey.ekran.web.viewmodels;
 
+import java.time.LocalDate;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
 
 import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.FilmographyItem;
@@ -10,7 +13,7 @@ public record PersonPageVm(
     long tmdbId,
     String name,
     String knownFor,
-    String biography,
+    String lifeDates,
     String profileUrl,
     List<DepartmentTabVm> departments,
     List<FilmographySectionVm> sections,
@@ -24,7 +27,7 @@ public record PersonPageVm(
             person.tmdbId(),
             person.name(),
             person.knownFor() == Department.OTHER ? null : person.knownFor().displayName(),
-            person.biography(),
+            lifeDates(person.born(), person.died()),
             person.profileUrl() == null ? null : person.profileUrl().toString(),
             List.of(
                 new DepartmentTabVm(Department.DIRECTING),
@@ -53,6 +56,23 @@ public record PersonPageVm(
 
     private static FilmographySectionVm section(String label, List<FilmographyItem> items) {
         return new FilmographySectionVm(label, items.stream().map(MovieCardVm::of).toList());
+    }
+
+    private static String lifeDates(LocalDate born, LocalDate died) {
+        if (born == null && died == null) {
+            return null;
+        }
+        if (died == null) {
+            return "Born " + fullDate(born);
+        }
+        if (born == null) {
+            return "Died " + fullDate(died);
+        }
+        return fullDate(born) + " – " + fullDate(died);
+    }
+
+    private static String fullDate(LocalDate date) {
+        return date.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + date.getDayOfMonth() + ", " + date.getYear();
     }
 
     public record DepartmentTabVm(

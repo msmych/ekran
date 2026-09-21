@@ -58,7 +58,8 @@ class RoutesTest {
     );
 
     private static final Person RIDLEY_SCOTT = new Person(
-        1, "Ridley Scott", Department.DIRECTING, "English filmmaker.",
+        1, "Ridley Scott", Department.DIRECTING,
+        LocalDate.parse("1937-11-30"), null,
         URI.create("https://img/profile.jpg"),
         new Filmography(
             List.of(new FilmographyItem(348, "Alien", 1979, URI.create("https://img/alien-card.jpg"))),
@@ -118,12 +119,17 @@ class RoutesTest {
     @Test
     void searchHotkeysScriptLoadedOnEveryPage() {
         JavalinTest.test(app(), (server, http) -> {
-            for (var path : List.of("/", "/movies/348", "/persons/1", "/movies/999", "/about")) {
+            for (var path : List.of("/movies/348", "/persons/1", "/movies/999", "/about")) {
                 var body = http.get(path).body().string();
                 assertThat(body).contains("src=\"/js/search.js\"");
                 assertThat(body).contains("href=\"/about\"");
+                // Cmd+K tip badge only on the compact overlay search
                 assertThat(body).contains("id=\"search-kbd\"");
             }
+            // home: no tip badge — the input is already focused and prominent
+            var home = http.get("/").body().string();
+            assertThat(home).contains("src=\"/js/search.js\"");
+            assertThat(home).doesNotContain("id=\"search-kbd\"");
             var script = http.get("/js/search.js");
             assertThat(script.code()).isEqualTo(200);
             var js = script.body().string();
@@ -223,6 +229,102 @@ class RoutesTest {
     }
 
     @Test
+    void homeRendersMoviesPeopleToggleDefaultingToMovies() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("data-search-type=\"person\"");
+            assertThat(body).contains(">Movies</button>");
+            assertThat(body).contains(">People</button>");
+            // movies active by default: exactly one active toggle button
+            assertThat(body.split("class=\"active\"", -1).length - 1).isEqualTo(1);
+            assertThat(body).contains("placeholder=\"Search movies…\"");
+            assertThat(body).contains("id=\"search-type\"");
+            assertThat(body).contains("hx-include=\"#search-type\"");
+        });
+    }
+
+    @Test
+    void personSearchDeepLinkRendersPeopleToggleAndPersonResults() {
+        var ridley = new SearchResult(1, SearchType.PERSON, "Ridley Scott", null, null, "Directing", null);
+        var app = appWithRepositories(
+            (q, p, t) -> new SearchResultPage(List.of(ridley)),
+            id -> Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/?q=ridley&type=person");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("placeholder=\"Search people…\"");
+            assertThat(body).contains("value=\"person\"");
+            assertThat(body).contains("Ridley Scott");
+            assertThat(body).contains("href=\"/persons/1\"");
+            // person rows carry no mark toggle (tmdbId is null)
+            assertThat(body).doesNotContain("data-card-mark");
+        });
+    }
+
+    @Test
+    void searchFragmentPassesPersonTypeToRepositoryAndRendersPersonRows() {
+        var capturedType = new java.util.concurrent.atomic.AtomicReference<SearchType>();
+        var ridley = new SearchResult(1, SearchType.PERSON, "Ridley Scott", null, null, "Directing", null);
+        var app = appWithRepositories(
+            (q, p, t) -> {
+                capturedType.set(t);
+                return new SearchResultPage(List.of(ridley));
+            },
+            id -> Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/search?q=ridley&type=person", request ->
+                request.header("HX-Request", "true"));
+
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(capturedType.get()).isEqualTo(SearchType.PERSON);
+            var body = response.body().string();
+            assertThat(body).doesNotContain("<!DOCTYPE");
+            assertThat(body).contains("href=\"/persons/1\"");
+            assertThat(body).doesNotContain("data-card-mark");
+        });
+    }
+
+    @Test
+    void searchFragmentDefaultsToMovieType() {
+        var capturedType = new java.util.concurrent.atomic.AtomicReference<SearchType>();
+        var app = appWithRepositories(
+            (q, p, t) -> {
+                capturedType.set(t);
+                return new SearchResultPage(List.of());
+            },
+            id -> Optional.empty(),
+            id -> Optional.empty()
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var response = http.get("/search?q=alien", request ->
+                request.header("HX-Request", "true"));
+
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(capturedType.get()).isEqualTo(SearchType.MOVIE);
+        });
+    }
+
+    @Test
+    void nonHomePagesCarryNoTypeToggle() {
+        JavalinTest.test(app(), (server, http) -> {
+            var body = http.get("/movies/348").body().string();
+
+            assertThat(body).doesNotContain("search-toggle");
+            assertThat(body).doesNotContain("id=\"search-type\"");
+            assertThat(body).contains("placeholder=\"Search movies…\"");
+        });
+    }
+
+    @Test
     void blankSearchShowsEmptyState() {
         JavalinTest.test(app(), (server, http) -> {
             var fragment = http.get("/search?q=%20%20", request ->
@@ -240,7 +342,7 @@ class RoutesTest {
         var wings = new SearchResult(1000, SearchType.MOVIE, "Wings of Desire", "Der Himmel über Berlin", 1987, "8.0", null);
         var alien = new SearchResult(348, SearchType.MOVIE, "Alien", "Alien", 1979, "8.2", null);
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of(wings, alien)),
+            (q, p, t) -> new SearchResultPage(List.of(wings, alien)),
             id -> Optional.empty(),
             id -> Optional.empty()
         );
@@ -258,7 +360,7 @@ class RoutesTest {
     @Test
     void noResultsShowsFriendlyMessage() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.empty(),
             id -> Optional.empty()
         );
@@ -346,7 +448,7 @@ class RoutesTest {
             List.of(), List.of(), List.of(), null, List.of()
         );
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(movie),
             id -> Optional.empty()
         );
@@ -364,7 +466,7 @@ class RoutesTest {
     @Test
     void listPageRendersCardsFromMovieParams() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> id == 348 ? Optional.of(ALIEN_MOVIE) : id == 9471 ? Optional.of(ALIENS_MOVIE) : Optional.empty(),
             id -> Optional.empty()
         );
@@ -397,7 +499,7 @@ class RoutesTest {
     @Test
     void listPageRendersCustomNameFromParam() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(ALIEN_MOVIE),
             id -> Optional.empty()
         );
@@ -412,7 +514,7 @@ class RoutesTest {
     @Test
     void listPageEscapesAndTruncatesNameParam() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(ALIEN_MOVIE),
             id -> Optional.empty()
         );
@@ -430,7 +532,7 @@ class RoutesTest {
     @Test
     void listPageBlankNameFallsBackToDefaultTitle() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(ALIEN_MOVIE),
             id -> Optional.empty()
         );
@@ -449,7 +551,7 @@ class RoutesTest {
             List.of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
             List.of(), List.of(), "en", List.of());
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> id == 348 ? Optional.of(movie) : Optional.empty(),
             id -> Optional.empty()
         );
@@ -477,7 +579,7 @@ class RoutesTest {
     @Test
     void listPageNormalizesMovieParams() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(movieWithId(id)),
             id -> Optional.empty()
         );
@@ -497,7 +599,7 @@ class RoutesTest {
             .mapToObj(i -> "movie=" + i)
             .collect(joining("&"));
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(movieWithId(id)),
             id -> Optional.empty()
         );
@@ -528,7 +630,7 @@ class RoutesTest {
     @Test
     void listPageOmitsUnavailableMovies() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> id == 348 ? Optional.of(ALIEN_MOVIE) : Optional.empty(),
             id -> Optional.empty()
         );
@@ -619,7 +721,7 @@ class RoutesTest {
             List.of()
         );
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> Optional.of(movie),
             id -> Optional.empty()
         );
@@ -637,7 +739,7 @@ class RoutesTest {
     @Test
     void unknownMovieIdReturns404() {
         var app = appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of()),
+            (q, p, t) -> new SearchResultPage(List.of()),
             id -> {
                 throw new NotFoundException("no movie");
             },
@@ -669,6 +771,7 @@ class RoutesTest {
             var body = response.body().string();
             assertThat(body).contains("Ridley Scott");
             assertThat(body).contains("Known for Directing");
+            assertThat(body).contains("Born November 30, 1937");
             assertThat(body).contains("href=\"/persons/1/directing\"");
             assertThat(body).contains("href=\"/persons/1/acting\"");
             assertThat(body).contains("href=\"/persons/1/writing\"");
@@ -682,12 +785,22 @@ assertThat(body).contains("href=\"/movies/348\"");
     }
 
     @Test
-    void personPageShowsBiography() {
-        JavalinTest.test(app(), (server, http) -> {
-            var body = http.get("/persons/1").body().string();
+    void personPageShowsBirthAndDeathDates() {
+        var deceased = new Person(
+            7, "Donald O'Connor", Department.ACTING,
+            LocalDate.parse("1925-08-28"), LocalDate.parse("2003-09-27"),
+            null,
+            new Filmography(List.of(), List.of(), List.of())
+        );
+        var app = appWithRepositories(
+            (q, p, t) -> new SearchResultPage(List.of()),
+            id -> Optional.empty(),
+            id -> Optional.of(deceased)
+        );
+        JavalinTest.test(app, (server, http) -> {
+            var body = http.get("/persons/7").body().string();
 
-            assertThat(body).contains("class=\"bio\"");
-            assertThat(body).contains("English filmmaker.");
+            assertThat(body).contains("August 28, 1925 – September 27, 2003");
         });
     }
 
@@ -715,7 +828,7 @@ assertThat(body).contains("href=\"/movies/348\"");
     @Test
     void tmdbFailureReturns503FriendlyPage() {
         var app = appWithRepositories(
-            (q, p) -> {
+            (q, p, t) -> {
                 throw new TmdbUnavailableException("boom");
             },
             id -> Optional.empty(),
@@ -757,7 +870,7 @@ assertThat(body).contains("href=\"/movies/348\"");
 
     private Javalin app() {
         return appWithRepositories(
-            (q, p) -> new SearchResultPage(List.of(ALIEN)),
+            (q, p, t) -> new SearchResultPage(List.of(ALIEN)),
             id -> Optional.of(ALIEN_MOVIE),
             id -> Optional.of(RIDLEY_SCOTT)
         );

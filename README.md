@@ -51,7 +51,7 @@ Then open <http://localhost:7070>.
 | Route | Purpose |
 |---|---|
 | `/` | Search-first homepage |
-| `/search?q={query}` | Movie search — full page, or results-only fragment for HTMX |
+| `/search?q={query}&type={movie\|person}` | Movie/people search — full page, or results-only fragment for HTMX; `type=person` (home toggle) searches people instead |
 | `/movies/{tmdbId}` | Movie detail (director, writers, principal cast are clickable; Trailers link opens a dialog with all videos; Open Graph tags power rich link previews — e.g. in Telegram) |
 | `/persons/{tmdbId}` | Person overview + filmography |
 | `/persons/{tmdbId}/{directing\|acting\|writing}` | Department filmography |
@@ -133,13 +133,14 @@ Search-as-you-type is HTMX with a 100 ms debounce and `hx-sync="this: replace"` 
 in-flight request and replaces it, so stale responses can't overwrite newer results and the
 final typed state always fires).
 
-The search bar is on every page (shared `searchbar.html` fragment) with a `⌘K` tip badge.
+The search bar is on every page (shared `searchbar.html` fragment) with a `⌘K` tip badge
+(non-home pages only — the home input is already focused and prominent).
 On the homepage it searches live in place; on every other page it's a compact input tucked
 top-right that drops a results overlay below it (Wikipedia-style) — Escape or click-away
 closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywhere; results
 are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
 [about page](/about) is linked from the footer. App JavaScript is just vendored
-`htmx.min.js` (2.0.4) plus two first-party files: a ~220-line `search.js` (hotkeys,
+`htmx.min.js` (2.0.4) plus two first-party files: a ~280-line `search.js` (hotkeys,
 Escape, click-away, keyboard nav) and a ~450-line `marked.js` (marking + share/QR).
 
 Movies can be **marked** (anonymous, `localStorage`-only — no accounts, no server state)
@@ -165,6 +166,6 @@ src/main/java/uk/matvey/ekran/
 
 ## Roadmap (not in step 1)
 
-- Persons in search results (search currently returns movies only)
+- Short-film flag / hide-shorts toggle — blocked on data: TMDB's search response carries no runtime (and no "Short" genre), so classifying search results would cost a detail call per result; revisit with the knowledge base or on `/list` (runtime already known there)
 - UI polish
 - PostgreSQL-backed local knowledge base with TMDB refresh (see `docs/data-model.md`)

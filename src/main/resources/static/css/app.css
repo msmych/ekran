@@ -311,7 +311,8 @@ body {
 }
 
 /* mobile blur race: a tap blurs the input before the click is synthesized —
-   keep the panel on screen briefly so the tap lands on the result */
+   keep the panel on screen briefly so search.js's manual click at `pointerup`
+   (and any browser-synthesized click) lands on the result */
 .search-overlay.tap-through {
     display: block;
 }
@@ -328,6 +329,37 @@ body {
 
 .home-search {
     position: relative;
+}
+
+/* no Cmd+K tip on home — only the spinner needs the right padding (34px + 14px) */
+.home-search #search-input {
+    padding-right: 48px;
+}
+
+/* home movies/people type toggle — tiny pill pair under the input */
+.search-toggle {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.search-toggle button {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.search-toggle button.active {
+    color: var(--text);
+    border-color: var(--text);
+    background: #fff;
 }
 
 .search-kbd {
@@ -365,20 +397,14 @@ body {
     flex: none;
 }
 
-/* clamped to ~2 lines (per docs): TMDB bios run long; full text stays
-   accessible to copy/AT, JS-free truncation */
-.bio {
-    margin: -8px 0 16px;
-    color: var(--muted);
-    font-size: 14px;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-}
-
 .movie h2, .person h2 {
     margin: 0 0 4px;
+}
+
+.life-dates {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
 }
 
 .original-title {
