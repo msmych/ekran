@@ -16,6 +16,9 @@ import uk.matvey.ekran.domain.SearchResult;
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
+import uk.matvey.ekran.auth.AuthService;
+import uk.matvey.ekran.auth.CapturingEmailService;
+import uk.matvey.ekran.auth.InMemoryAuthRepository;
 import uk.matvey.ekran.repository.MovieRepository;
 import uk.matvey.ekran.repository.PersonRepository;
 import uk.matvey.ekran.repository.SearchRepository;
@@ -24,6 +27,8 @@ import uk.matvey.ekran.service.PersonService;
 import uk.matvey.ekran.service.SearchService;
 
 import java.net.URI;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -884,7 +889,18 @@ assertThat(body).contains("href=\"/movies/348\"");
         return EkranApp.create(
             new SearchService(searchRepository),
             new MovieService(movieRepository),
-            new PersonService(personRepository)
+            new PersonService(personRepository),
+            // anonymous by default: fresh in-memory auth state per app instance
+            new AuthService(
+                new InMemoryAuthRepository(),
+                new CapturingEmailService(),
+                "https://ekran.test",
+                Duration.ofMinutes(15),
+                Duration.ofDays(30),
+                false,
+                Clock.systemUTC()),
+            true,
+            null
         );
     }
 }

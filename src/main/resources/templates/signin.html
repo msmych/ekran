@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Sign in — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <article class="auth-card">
+        <h2>Sign in to ekran</h2>
+        <p class="auth-note">Enter your email and we'll send you a magic link.</p>
+        <p class="auth-error" th:if="${error != null}" th:text="${error}">error</p>
+        <form class="auth-form" method="post" action="/signin" hx-boost="false">
+            <input class="auth-email" type="email" name="email" required autofocus
+                   placeholder="email@example.com" autocomplete="email"
+                   th:value="${email}">
+            <input type="hidden" name="next" th:value="${next}">
+            <button class="auth-submit" type="submit">Send magic link</button>
+        </form>
+    </article>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

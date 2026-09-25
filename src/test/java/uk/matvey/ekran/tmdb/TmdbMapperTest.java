@@ -18,7 +18,10 @@ class TmdbMapperTest {
     private static final AppConfig CONFIG = new AppConfig(
         "test-token", 7070,
         "https://api.themoviedb.org/3", "https://image.tmdb.org/t/p",
-        2000, 3000, 5000
+        2000, 3000, 5000,
+        "postgres://ekran:pg@localhost:5432/ekran", "re_test",
+        "https://api.resend.com", "ekran <no-reply@ekran.uk>", "https://ekran.uk",
+        15, 30
     );
 
     private final ObjectMapper objectMapper = new ObjectMapper();

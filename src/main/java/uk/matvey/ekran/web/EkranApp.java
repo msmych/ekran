@@ -1,10 +1,15 @@
 package uk.matvey.ekran.web;
 
+import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Map;
+
+import javax.sql.DataSource;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
+import io.javalin.rendering.FileRenderer;
 import io.javalin.rendering.template.JavalinThymeleaf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +17,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import uk.matvey.ekran.auth.AuthService;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
@@ -28,7 +34,14 @@ public final class EkranApp {
     private EkranApp() {
     }
 
-    public static Javalin create(SearchService searchService, MovieService movieService, PersonService personService) {
+    public static Javalin create(
+        SearchService searchService,
+        MovieService movieService,
+        PersonService personService,
+        AuthService authService,
+        boolean secureCookies,
+        DataSource dataSource
+    ) {
         var templateResolver = new ClassLoaderTemplateResolver();
         templateResolver.setPrefix("/templates/");
         templateResolver.setSuffix(".html");
@@ -43,18 +56,22 @@ public final class EkranApp {
                 staticFiles.location = Location.CLASSPATH;
                 staticFiles.headers = Map.of("Cache-Control", "no-cache");
             });
-            cfg.fileRenderer(new JavalinThymeleaf(templateEngine));
+            var thymeleaf = new JavalinThymeleaf(templateEngine);
+            cfg.fileRenderer(mergeAuthModel(thymeleaf));
             cfg.requestLogger.http((ctx, ms) ->
-                log.info("{} {} -> {} ({} ms)", ctx.method(), ctx.path(), ctx.status(), ms == null ? "-" : Math.round(ms)));
+                // request URI only, never the query string — it would log raw magic-link tokens
+                log.info("{} {} -> {} ({} ms)", ctx.method(), ctx.req().getRequestURI(), ctx.status(), ms == null ? "-" : Math.round(ms)));
         });
         // explicit revalidation everywhere: without it browsers heuristically cache
         // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
         // and serves stale JS after deploys — mismatched markup/JS versions follow)
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
+        app.before(ctx -> resolveCurrentUser(ctx, authService));
         new SearchRoutes(searchService).register(app);
         new MovieRoutes(movieService).register(app);
         new PersonRoutes(personService).register(app);
         new ListRoutes(movieService).register(app);
+        new AuthRoutes(authService, secureCookies).register(app);
         app.get("/about", ctx -> ctx.render("about"));
         app.get("/videos/{key}", ctx -> {
             var key = ctx.pathParam("key");
@@ -68,8 +85,43 @@ public final class EkranApp {
         });
         registerErrorHandlers(app);
         app.get("/healthz", ctx -> ctx.result("ok"));
-        app.get("/health", ctx -> ctx.json(Map.of("status", "UP")));
+        app.get("/health", ctx -> health(ctx, dataSource));
         return app;
+    }
+
+    // userEmail/currentPath come from the session middleware, not from per-route
+    // models — the header needs them on every page (Sign in link vs account menu)
+    private static FileRenderer mergeAuthModel(FileRenderer delegate) {
+        return (filePath, model, ctx) -> {
+            var merged = new HashMap<String, Object>(model);
+            merged.put("userEmail", ctx.<String>attribute("userEmail"));
+            merged.put("currentPath", ctx.<String>attribute("currentPath"));
+            return delegate.render(filePath, merged, ctx);
+        };
+    }
+
+    private static void resolveCurrentUser(Context ctx, AuthService authService) {
+        var uri = ctx.req().getRequestURI();
+        var query = ctx.req().getQueryString();
+        ctx.attribute("currentPath", query == null ? uri : uri + "?" + query);
+        var sessionId = ctx.cookie(authService.sessionCookieName());
+        if (sessionId != null) {
+            authService.userEmailFor(sessionId).ifPresent(email -> ctx.attribute("userEmail", email));
+        }
+    }
+
+    private static void health(Context ctx, DataSource dataSource) {
+        if (dataSource == null) {
+            ctx.json(Map.of("status", "UP"));
+            return;
+        }
+        try (var conn = dataSource.getConnection(); var st = conn.createStatement()) {
+            st.executeQuery("SELECT 1");
+            ctx.json(Map.of("status", "UP"));
+        } catch (SQLException e) {
+            log.warn("health check: database unreachable: {}", e.getMessage());
+            ctx.status(503).json(Map.of("status", "DOWN"));
+        }
     }
 
     private static void registerErrorHandlers(Javalin app) {

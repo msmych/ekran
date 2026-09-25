@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Account — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <article class="auth-card">
+        <h2>Account</h2>
+        <p><strong th:text="${userEmail}">email</strong></p>
+        <form class="auth-form" method="post" action="/signout" hx-boost="false">
+            <input type="hidden" name="next" value="/">
+            <button class="auth-submit" type="submit">Sign out</button>
+        </form>
+    </article>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

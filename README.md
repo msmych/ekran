@@ -3,19 +3,23 @@
 Quick movie search — a fast, no-bloat movie discovery web app. Open the site, start typing, results
 appear as you type, open a movie, jump to a director's/actor's/writer's filmography.
 
-Step 1 is TMDB-backed: Javalin (no Spring), server-rendered Thymeleaf + HTMX, no frontend framework,
-no persistence. See [`docs/`](docs/) for the full spec; the deployment plan is documented in the
-Deployment section below and in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
+Step 1 is TMDB-backed: Javalin (no Spring), server-rendered Thymeleaf + HTMX, no frontend framework.
+The only persistence is auth state (users, magic-link tokens, sessions in PostgreSQL). See [`docs/`](docs/) for the
+full spec; the deployment plan is documented in the Deployment section below and in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
 
 ## Requirements
 
 - JDK 25 (any JDK 25 works; Gradle auto-provisions it via toolchains if missing)
+- Docker — for PostgreSQL (dev compose, integration tests via Testcontainers) and deployment
 - A TMDB API **v4 read access token** — <https://www.themoviedb.org/settings/api>
+- A Resend API key (magic-link emails) — <https://resend.com/api-keys>
 
 ## Setup
 
 ```bash
 export TMDB_API_TOKEN="your-v4-read-access-token"
+export RESEND_API_KEY="re_..."
+export DATABASE_URL="postgres://user:pass@localhost:5432/ekran"
 ```
 
 Optional configuration (all via environment variables):
@@ -28,23 +32,55 @@ Optional configuration (all via environment variables):
 | `TMDB_CONNECT_TIMEOUT_MS` | `2000` |
 | `TMDB_SEARCH_TIMEOUT_MS` | `3000` |
 | `TMDB_DETAIL_TIMEOUT_MS` | `5000` |
+| `RESEND_BASE_URL` | `https://api.resend.com` |
+| `AUTH_FROM_EMAIL` | `ekran <no-reply@ekran.uk>` |
+| `PUBLIC_BASE_URL` | `https://ekran.uk` — base for magic-link URLs; `https://` also turns on the `Secure` session cookie |
+| `AUTH_TOKEN_TTL_MINUTES` | `15` |
+| `AUTH_SESSION_DAYS` | `30` |
 
-The token is never committed or logged; the app fails fast at startup if it is missing.
+The secrets are never committed or logged; the app fails fast at startup if any of
+`TMDB_API_TOKEN`, `DATABASE_URL` or `RESEND_API_KEY` is missing.
 
 ## Run
 
 ```bash
+docker compose -f compose.dev.yml up -d db   # PostgreSQL on localhost:5433 (ekran:ekran/ekran)
 ./gradlew run
 ```
 
-Then open <http://localhost:7070>.
+Then open <http://localhost:7070>. (Or run the whole stack: `docker compose -f compose.dev.yml up`.)
+
+`./gradlew run` loads `.env` from the repo root into the process environment (TMDB_API_TOKEN,
+RESEND_API_KEY, …). `DATABASE_URL` defaults to `postgres://ekran:ekran@localhost:5433/ekran`
+(the dev compose Postgres) and `PUBLIC_BASE_URL` to `http://localhost:7070`, so local magic
+links point at localhost.
 
 ## Test
 
 ```bash
-./gradlew test      # unit + route/integration tests (no network, no API key needed)
+./gradlew test      # unit + route/integration tests; the PgAuthRepositoryTest cases need Docker (Testcontainers)
 ./gradlew check
 ```
+
+## Authentication
+
+Email magic link only — no passwords, no separate registration (a first sign-in creates
+the account). `Sign in` in the header is deliberately small: the app stays fully usable
+anonymously (marks/sharing/printing are localStorage-only and unchanged). After
+signing in the header shows an `Account` menu with the email and `Sign out`.
+
+```
+POST /signin            email → one-time token (SHA-256-hashed in Postgres, 15 min TTL,
+                        single-use, rate-limited per email and per IP) → email via Resend
+GET  /auth/link?token=  consumes the token → opaque server-side session →
+                        `__Host-`-prefixed HttpOnly+Secure+SameSite=Lax cookie (plain name on
+                        local http) → redirect back to the page you came from (same-site paths
+                        only, never arbitrary URLs)
+```
+
+Post-login redirects are allowlisted (`/…` paths only); the generic "check your email"
+response never reveals whether an email has an account. The account page (`/account`)
+shows the email and a sign-out button (logout deletes the server-side session).
 
 ## URLs
 
@@ -57,20 +93,22 @@ Then open <http://localhost:7070>.
 | `/persons/{tmdbId}/{directing\|acting\|writing}` | Department filmography |
 | `/list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, no accounts; the Share chip opens a QR dialog with a copyable link |
 | `/list/card?movie={id}` | HTMX-only single-card fragment (used when marking from the search overlay while viewing `/list`) |
+| `/signin` · `/signin/sent` · `/auth/link?token=…` | Passwordless email sign-in (magic link) |
+| `/account` | Minimal account page (email + sign out) |
 | `/about` | About page |
 | `/videos/{key}` | HTMX-only YouTube player fragment (used by the movie page) |
 | `/health` `/healthz` | Health/readiness checks (no TMDB calls) |
 
 ## Deployment
 
-Single-VPS production: nginx (TLS, Let's Encrypt) → app container, no database yet.
-Details in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
+Single-VPS production: nginx (TLS, Let's Encrypt) → app container → PostgreSQL, all on the
+internal compose network. Details in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
 
 **Local development (Docker):**
 
 ```bash
 export TMDB_API_TOKEN="eyJhbGci..."
-docker compose -f compose.dev.yml up   # app on http://localhost:7070
+docker compose -f compose.dev.yml up   # app on http://localhost:7070, Postgres on localhost:5433
 ```
 
 **Production image:** multi-stage `Dockerfile` — Temurin JDK 25 build stage, Temurin JRE 25 runtime,
@@ -86,7 +124,8 @@ non-root user, built-in `HEALTHCHECK` on `/health`, pinned base versions.
 
 **Server-side setup (once):**
 1. VPS with Docker + Compose + git; firewall: 22/80/443 only; non-root deploy user in the `docker` group (SSH keys).
-2. `~/ekran/.env` with `TMDB_API_TOKEN` (never committed) — the deploy fails fast with a clear message until it exists.
+2. `~/ekran/.env` with `TMDB_API_TOKEN`, `RESEND_API_KEY` and `POSTGRES_PASSWORD` (never committed) —
+   the deploy fails fast with a clear message until it exists.
    The config-only checkout itself (`~/ekran`) is bootstrapped automatically on the first deploy
    (no JDK/Gradle needed — the server never builds; if the repo is private, clone it manually).
 3. DNS for the domain → VPS IP; edit `nginx/conf.d/ekran.conf`;
@@ -95,9 +134,8 @@ non-root user, built-in `HEALTHCHECK` on `/health`, pinned base versions.
 
 **Rollback:** `.deployed-image` on the server keeps the current tag; deploys restore it on health-check
 failure, or manually: `APP_IMAGE=ghcr.io/<owner>/ekran:<sha> docker compose up -d app` (from `~/ekran`).
-
-When PostgreSQL lands (step 2), it joins as a third compose service on the internal network only —
-the repository boundary makes that an additive change.
+PostgreSQL joins as a third compose service (`db`, `postgres:18-alpine`, internal network only,
+`db-data` volume); the app runs SQL migrations from `/db/migration/V<n>.sql` at startup.
 
 ## TMDB attribution
 
@@ -112,13 +150,16 @@ Movie and person pages also link to the corresponding `themoviedb.org` page
 ## Architecture
 
 ```
-web       Javalin routes, view models, Thymeleaf templates
+web       Javalin routes, view models, Thymeleaf templates (+ auth session middleware)
   ↓
 service   search / movie / person application logic
+auth      magic-link tokens, server-side sessions, rate limiting
   ↓
-repository  interfaces for movie/person/search retrieval
+email     EmailService abstraction → ResendEmailService → Resend API
   ↓
-tmdb      TMDB client, API DTOs, mapping into domain models
+repository  interfaces for movie/person/search retrieval        auth repository (JDBC)
+  ↓
+tmdb      TMDB client, API DTOs, mapping into domain models    db: migrations + Hikari pool
 ```
 
 Key rule: **TMDB DTOs never leave the `tmdb` package.** Everything above the repositories speaks
@@ -155,9 +196,12 @@ dialog on `/list`, print it (with original titles and directors), or clear it th
 
 ```
 src/main/java/uk/matvey/ekran/
-├── Main.java        wiring + bootstrap
+├── Main.java        wiring + bootstrap (migrations run at startup)
 ├── config/          AppConfig (env parsing, validation)
-├── web/             routes, viewmodels, error handling
+├── web/             routes, viewmodels, error handling, auth middleware
+├── auth/            AuthService, tokens/hashing, rate limiting, PgAuthRepository
+├── email/           EmailService → ResendEmailService, magic-link email
+├── db/              DbMigrations (V<n>.sql runner), DataSources (Hikari)
 ├── service/         SearchService, MovieService, PersonService
 ├── domain/          Movie, Person, Filmography, SearchResult, …
 ├── repository/      interfaces

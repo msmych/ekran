@@ -4,22 +4,51 @@ services:
     # Set via APP_IMAGE environment variable (see .github/workflows/deploy.yml).
     image: ${APP_IMAGE:?APP_IMAGE must be set, e.g. ghcr.io/owner/ekran:<commit-sha>}
     restart: unless-stopped
-    # Secrets and environment-specific config live in the untracked .env file on the server.
-    # Optional here — the app itself fails fast at startup if TMDB_API_TOKEN is missing.
+    # Secrets and environment-specific config live in the untracked .env file on the server
+    # (TMDB_API_TOKEN, RESEND_API_KEY, POSTGRES_PASSWORD). Optional here — the app itself
+    # fails fast at startup if they are missing.
     env_file:
       - path: .env
         required: false
     environment:
       PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-ekran}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-ekran}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://ekran.uk}
     # Loopback only, for host-side health checks; nginx reaches the app over the compose network.
     ports:
       - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ekran}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ekran}
+    volumes:
+      # postgres 18+: mount the parent dir so pg_upgrade stays inside the volume boundary
+      - db-data:/var/lib/postgresql
+    # internal network only — never published to the host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ekran} -d ${POSTGRES_DB:-ekran}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     logging:
       driver: json-file
       options:
@@ -44,3 +73,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  db-data:

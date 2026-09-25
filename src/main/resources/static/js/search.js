@@ -265,6 +265,14 @@
         }
     });
 
+    // account menu: click-away closes the open <details>
+    document.addEventListener('click', function (event) {
+        var menu = document.querySelector('details[data-account-menu][open]');
+        if (menu && !menu.contains(event.target)) {
+            menu.removeAttribute('open');
+        }
+    });
+
     // Cmd+K tip: platform-correct label; document-level so it survives htmx swaps,
     // and re-applied after each swap (boosted navigation re-inserts the raw template label)
     function applyKbdLabel() {

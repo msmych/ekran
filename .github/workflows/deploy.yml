@@ -67,7 +67,7 @@ jobs:
             cd "$EKRAN_DIR"
 
             if [ ! -f .env ]; then
-              echo "ERROR: create $EKRAN_DIR/.env with TMDB_API_TOKEN once on this host" >&2
+              echo "ERROR: create $EKRAN_DIR/.env with TMDB_API_TOKEN, RESEND_API_KEY and POSTGRES_PASSWORD once on this host" >&2
               exit 1
             fi
 
@@ -83,7 +83,7 @@ jobs:
             # the server keeps a config-only checkout of this repository
             git pull --ff-only
 
-            APP_IMAGE="$NEW_IMAGE" docker compose pull app
+            APP_IMAGE="$NEW_IMAGE" docker compose pull app db
             APP_IMAGE="$NEW_IMAGE" docker compose up -d app
 
             # health check: retry for up to ~30s, roll back on failure

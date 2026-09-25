@@ -16,11 +16,14 @@ dependencies {
     implementation(libs.thymeleaf)
     implementation(libs.jackson.databind)
     implementation(libs.logback.classic)
+    implementation(libs.postgresql)
+    implementation(libs.hikaricp)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
     testImplementation(libs.mockwebserver)
     testImplementation(libs.javalin.testtools)
+    testImplementation(libs.testcontainers.postgresql)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
@@ -36,4 +39,16 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.named<JavaExec>("run") {
+    val dotenv = file(".env").takeIf { it.exists() }?.readLines()
+        ?.filter { it.isNotBlank() && !it.startsWith("#") }
+        ?.associate { line ->
+            val (key, value) = line.split("=", limit = 2)
+            key.trim() to value.trim().removeSurrounding("\"")
+        } ?: emptyMap()
+    environment.putAll(dotenv)
+    environment.putIfAbsent("DATABASE_URL", "postgres://ekran:ekran@localhost:5433/ekran")
+    environment.putIfAbsent("PUBLIC_BASE_URL", "http://localhost:7070")
 }

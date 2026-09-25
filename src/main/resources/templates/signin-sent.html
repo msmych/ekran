@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Check your email — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <article class="auth-card">
+        <h2>Check your email</h2>
+        <p th:if="${email != null}">We sent a sign-in link to <strong th:text="${email}">your email</strong>.</p>
+        <p th:if="${email == null}">We sent a sign-in link to your email address.</p>
+        <p class="auth-note" th:text="'The link expires in ' + ${ttlMinutes} + ' minutes and can only be used once.'">The link expires in 15 minutes and can only be used once.</p>
+        <p class="auth-note">If an account can be created or signed in with this email, we've sent you a link.</p>
+        <p><a href="/signin">Use a different email</a></p>
+    </article>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

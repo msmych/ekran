@@ -31,7 +31,10 @@ class TmdbClientTest {
             "secret-token", 7070,
             server.url("/3").toString(),
             "https://image.tmdb.org/t/p",
-            1000, 300, 1000
+            1000, 300, 1000,
+            "postgres://ekran:pg@localhost:5432/ekran", "re_test",
+            "https://api.resend.com", "ekran <no-reply@ekran.uk>", "https://ekran.uk",
+            15, 30
         );
         client = new TmdbClient(HttpClient.newHttpClient(), objectMapper, config);
     }

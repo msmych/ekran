@@ -24,10 +24,24 @@ jobs:
 
       - name: Container smoke test
         run: |
-          docker run -d --name ekran-smoke -p 127.0.0.1:18080:8080 -e TMDB_API_TOKEN=dummy ekran:ci
+          docker network create ekran-net
+          docker run -d --name ekran-db --network ekran-net \
+            -e POSTGRES_USER=ekran -e POSTGRES_PASSWORD=ekran -e POSTGRES_DB=ekran \
+            postgres:18-alpine
+          for i in $(seq 1 20); do
+            docker exec ekran-db pg_isready -U ekran -d ekran && break
+            sleep 1
+          done
+          docker run -d --name ekran-smoke --network ekran-net -p 127.0.0.1:18080:8080 \
+            -e TMDB_API_TOKEN=dummy \
+            -e DATABASE_URL=postgres://ekran:ekran@ekran-db:5432/ekran \
+            -e RESEND_API_KEY=dummy \
+            -e PUBLIC_BASE_URL=https://ekran.uk \
+            ekran:ci
           for i in $(seq 1 20); do
             curl -fsS http://127.0.0.1:18080/health && break
             sleep 1
           done
           curl -fsS http://127.0.0.1:18080/health | grep -q '"UP"'
-          docker rm -f ekran-smoke
+          curl -fsS http://127.0.0.1:18080/signin | grep -q 'Sign in to ekran'
+          docker rm -f ekran-smoke ekran-db

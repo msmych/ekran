@@ -266,6 +266,121 @@ body {
     color: var(--accent);
 }
 
+.signin-link {
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.signin-link:hover {
+    color: var(--accent);
+}
+
+.account {
+    position: relative;
+}
+
+.account summary {
+    list-style: none;
+}
+
+.account summary::-webkit-details-marker {
+    display: none;
+}
+
+.account-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-width: 200px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.account-email {
+    font-size: 13px;
+    color: var(--muted);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    word-break: break-all;
+}
+
+.account-signout {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.account-signout:hover {
+    color: var(--accent);
+}
+
+.auth-card {
+    max-width: 380px;
+    margin: 48px auto 0;
+}
+
+.auth-card h2 {
+    margin: 0 0 8px;
+}
+
+.auth-note {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.auth-error {
+    color: var(--accent);
+    font-size: 14px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.auth-form input[type="email"] {
+    width: 100%;
+    font-size: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.auth-form input[type="email"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+
+.auth-submit {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.auth-submit:hover {
+    opacity: 0.9;
+}
+
 .home-header-row {
     flex-wrap: wrap;
 }
