@@ -8,30 +8,16 @@
     <div th:replace="~{header :: header(false)}"></div>
     <section class="marked-list">
         <div class="list-head">
-            <!-- the pencil lives INSIDE the title, right after the name (a sibling
-                 button used to float mid-row: .list-head is space-between, so it
-                 never sat next to the name). Both the text and the pencil start
-                 the inline rename; the input is aligned to the title text -->
-            <h2 data-list-title>
-                <span data-list-title-text th:text="${title}">Marked movies</span>
-                <button type="button" class="list-name-edit" data-list-name-edit aria-label="Rename list"
-                        th:hidden="${cards.isEmpty()}">
-                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                        <path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/>
-                    </svg>
-                </button>
-            </h2>
-            <input type="text" class="list-name-input" data-list-name-input maxlength="60" aria-label="List name" hidden>
+            <h2>Marked movies</h2>
             <div class="list-actions">
                 <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <button type="button" class="chip-button" th:if="${userId != null && !cards.isEmpty()}"
+                <button type="button" class="chip-button" th:if="${!cards.isEmpty()}"
                         data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
+                        th:attr="hx-get=@{/playlists/select(movie=${movieIds},from='marked')}"
                         hx-target="#playlist-select-body"
-                        hx-swap="innerHTML">Add to playlist</button>
-                <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
-                <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
+                        hx-swap="innerHTML">Add all to playlist</button>
+                <button type="button" class="chip-button" data-clear-marks th:hidden="${cards.isEmpty()}">Clear all</button>
             </div>
         </div>
         <ul class="movie-cards">

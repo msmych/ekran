@@ -63,7 +63,7 @@ Note the strategy choice: htmx's `abort` is **not** "new request aborts the old 
 
 ## Hotkeys and overlay close: `search.js`
 
-Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~280 lines), loaded (deferred) on every page. A second first-party file, `static/js/marked.js` (~450 lines), handles the marking/share feature — see the marking section in `routes-and-views.md`. A plain `document`-level keydown listener (not an inline `hx-on` handler):
+Hotkeys and overlay dismissal live in a single small file, `static/js/search.js` (~280 lines), loaded (deferred) on every page. A second first-party file, `static/js/marked.js` (~660 lines), handles the marking/share feature — see the marking section in `routes-and-views.md`. A plain `document`-level keydown listener (not an inline `hx-on` handler):
 
 - `/` — vim/Google-style quick focus, matched via `event.code === 'Slash'` **and** `event.key === '/'` so it works on non-US keyboard layouts (`event.key` alone breaks on e.g. Cyrillic layouts, which is why the first inline-handler attempt "didn't work" in real use). Skipped while already typing in an input/textarea/select, so a `/` inside the search box is just a character.
 - `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux), matched via `event.code === 'KeyK'` — the modern standard (GitHub, Slack, Notion); works even from within the input, and selects the existing query for quick replacement.

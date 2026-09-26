@@ -14,7 +14,7 @@ Principles: fast tests, no network, no real API key, boring tools (JUnit 5 + Ass
 ### Services
 - `SearchService`: blank/whitespace query → empty; trimming; oversized query → empty; repository failure → typed error surfaced; success path passes results through with correct VM shape.
 - `MovieService`: repository hit → assembled VM (runtime formatting `1h 52m`, rating rounding, writers with jobs, cast links); repository miss → not-found.
-- `PersonService`: filmography grouping by department, year-desc sorting, undated last; department filtering for `/persons/{id}/{department}`; bad department → not-found.
+- Filmography grouping/sorting/filtering (department pages, year-desc, undated last, bad department → not-found) is covered via `TmdbMapperTest` mapping and `RoutesTest` route assertions — `PersonService` itself is a thin passthrough with no separate unit test.
 
 ### Config
 - Env parsing, defaults, fail-fast on missing token, timeout validation; masked toString.
@@ -38,6 +38,26 @@ Javalin test utilities (`app.get("/...")` against a started server with stubbed 
 - `/movies/{id}` → 200 with title, director link, cast links; `/persons/{id}` → 200 with filmography sections and tabs.
 - `/list?movie=…` → order-preserving render, param normalization (whitespace, `+`-encoded values, dupes collapse, invalid dropped), 100-movie cap, unavailable movies skipped, empty state.
 - TMDB unavailable → 503, friendly body, no stack trace, no TMDB payload leaked.
+
+### Marks & playlists (auth-gated routes — `AuthRoutesTest`)
+
+The test app is built against in-memory `MarksRepository`/`PlaylistsRepository` fakes and a session-cookie–signing helper; requests go through a no-redirects OkHttp client:
+
+- Anonymous page access (`/marked`, `/playlists`, `/playlists/{id}`) → 303 to `/signin`; unauthenticated mutations and `GET /playlists/select` (an HTMX fragment endpoint) → **401** (no redirect — fetch-style callers must see the status).
+- Mark sync: bad movie id → 400; toggle → 204; bulk `POST /marked?movie=…` is idempotent and `GET /marked/ids` round-trips the set; the authed page carries the `data-marked-ids` seed span.
+- Playlist CRUD lifecycle: create → 303 + `Location`; rename (trimmed); delete → 303; detail page renders cards; dialog fragment single-movie (toggle mode) vs multi-movie (bulk mode, "Add N movies to…").
+- Name validation: blank/whitespace and >60 chars → 400; trimming applied on create.
+- Ownership scoping: bob hitting alice's playlist id → 404 on detail and every mutation; alice's data untouched afterwards (apostrophes assert the Thymeleaf-escaped form `&#39;`).
+
+### PostgreSQL repositories (Testcontainers, need Docker)
+
+- `PgAuthRepositoryTest`, `PgMarksRepositoryTest`, `PgPlaylistsRepositoryTest` — all Testcontainers-based (Docker required). Auth covers user upsert, token hash/TTL/single-use, sessions, **and migration idempotency**: re-running the migration set must be a no-op; update the expected migration count (`V<n>` latest) when adding one. Marks cover idempotency/per-user isolation; playlists cover CRUD, insert-order positions, cascade delete, ownership isolation, recency ordering.
+- `PgMarksRepositoryTest` — mark/unmark, bulk, idempotency, per-user isolation.
+- `PgPlaylistsRepositoryTest` — CRUD, insert-order positions (`MAX+1`), cascade delete of memberships, ownership isolation (foreign id → not-found), recency ordering.
+
+### Auth routes
+
+Magic-link flow tests (sign-in → token consumption → session cookie semantics) live in `AuthRoutesTest` alongside the marks/playlist route tests.
 
 ## Route/integration tests with real template rendering
 

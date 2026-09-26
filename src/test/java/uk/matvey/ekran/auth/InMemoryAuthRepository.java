@@ -71,12 +71,13 @@ public class InMemoryAuthRepository implements AuthRepository {
     }
 
     @Override
-    public Optional<String> findSessionEmail(String sessionIdHash, Instant now) {
+    public Optional<AuthRepository.SessionUser> findSession(String sessionIdHash, Instant now) {
         var session = sessions.get(sessionIdHash);
         if (session == null || !session.expiresAt().isAfter(now)) {
             return Optional.empty();
         }
-        return Optional.ofNullable(emailByUserId.get(session.userId()));
+        var email = emailByUserId.get(session.userId());
+        return email == null ? Optional.empty() : Optional.of(new AuthRepository.SessionUser(session.userId(), email));
     }
 
     @Override

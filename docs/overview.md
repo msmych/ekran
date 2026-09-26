@@ -23,13 +23,13 @@ This is **not** a Letterboxd/IMDb replacement. No social layer, reviews, feeds, 
 | Root package | `uk.matvey.ekran` |
 | Web framework | Javalin (no Spring) |
 | Template engine | Thymeleaf (server-side rendering) |
-| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~280 lines, `marked.js` ~450 lines), basic no-frills UI in Step 1 |
+| Frontend | Server-rendered HTML + HTMX (vendored locally) + two small first-party JS files (`search.js` ~290 lines, `marked.js` ~660 lines), basic no-frills UI in Step 1 |
 | Search from any page | Search bar on every page: live in-page on the homepage, compact overlay panel (Wikipedia-style) elsewhere; `/` and Cmd/Ctrl+K focus it from anywhere |
 | TMDB auth | v4 Bearer token (`Authorization: Bearer …`), env var only |
 | Search scope | Movies by default; a home Movies/People toggle switches to person search (`type=person`) |
 | Route naming | Plural resources: `/movies/{id}`, `/persons/{id}` |
 | Logging | SLF4J + Logback |
-| Persistence | None in MVP (repository abstraction only) |
+| Persistence | None in Step 1 (repository abstraction only) — **superseded by Step 2**: PostgreSQL for auth, marks, playlists |
 
 ## Primary success criterion
 
@@ -43,18 +43,18 @@ The user can go from an empty browser tab to the relevant movie/person informati
 - Person links are navigable from movie pages.
 - Person page with filmography, filterable by department (directing / acting / writing).
 - Deep-linkable URLs for movies, people, and searches.
-- Anonymous marking (localStorage, `m` shortcut) with a shareable `/list?movie=…` page — the URL is the list; share link + QR, no accounts, no server-side state.
+- Anonymous marking (localStorage, `m` shortcut) with a shareable `/list?movie=…` page — the URL is the list; share link + QR, no accounts, no server-side state. **Step 2 addition:** signed-in users' marks are stored server-side in PostgreSQL (`marked_movies`) and migrated from `localStorage` on first authenticated load; the header `Marked · N` then points at `/marked` instead of `/list`. Signed-in users can also group movies into **playlists** (PostgreSQL, insert-ordered, ownership-scoped) and share a playlist as a plain `/list?movie=…&name=…` URL.
 - Responsive layout for desktop and mobile.
 
 ## Explicit non-goals for MVP
 
 - No Spring / Spring Boot.
 - No React / Vue / Angular.
-- No PostgreSQL dependency (only a clean repository boundary).
-- No user ratings, reviews, server-side watchlists, social features, recommendations, feeds (anonymous localStorage marking + shared `/list` URLs exist — deliberately client-only, see `routes-and-views.md`).
+- No PostgreSQL dependency in Step 1 (only a clean repository boundary) — **superseded by Step 2**: PostgreSQL for auth, marks, playlists.
+- No user ratings, reviews, recommendations, feeds, social features (marking + playlists + shared `/list` URLs exist — see `routes-and-views.md`; marking is client-only for anonymous visitors, PostgreSQL-backed once signed in).
 - No streaming-provider aggregation unless effectively free from the core implementation.
 - No attempt to mirror the complete TMDB data model.
-- No user accounts or persistent user-specific server-side state.
+- No user accounts or persistent user-specific server-side state in Step 1 — **superseded by Step 2**: magic-link accounts with server-side marks and playlists.
 
 ## Deferred to a follow-up step (explicitly out of Step 1)
 

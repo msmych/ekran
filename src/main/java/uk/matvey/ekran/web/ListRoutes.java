@@ -8,13 +8,12 @@ import java.util.regex.Pattern;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 
+import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.web.viewmodels.MovieCardVm;
 
 public class ListRoutes {
-
-    private static final int MAX_MOVIES = 100;
 
     private static final int MAX_NAME = 60;
 
@@ -34,7 +33,7 @@ public class ListRoutes {
     private void list(Context ctx) {
         var ids = movieIds(ctx.queryParams("movie"));
         var cards = movieService.findByIds(ids).stream().map(MovieCardVm::of).toList();
-        ctx.render("list", Map.of("cards", cards, "title", title(ctx.queryParam("name"))));
+        ctx.render("list", Map.of("cards", cards, "title", title(ctx.queryParam("name")), "movieIds", ids));
     }
 
     // fragment for one card — used by marked.js when a movie is marked from the
@@ -68,6 +67,6 @@ public class ListRoutes {
                 unique.add(Long.parseLong(raw));
             }
         }
-        return unique.stream().limit(MAX_MOVIES).toList();
+        return unique.stream().limit(MovieIds.MAX_SET).toList();
     }
 }

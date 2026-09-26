@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Playlists — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <section class="marked-list">
+        <div class="list-head">
+            <h2>My playlists</h2>
+            <form method="post" action="/playlists" class="playlist-new-form">
+                <input type="text" name="name" maxlength="60" placeholder="New playlist name" required>
+                <button type="submit" class="chip-button">New playlist</button>
+            </form>
+        </div>
+        <ul class="playlist-index">
+            <li th:each="p : ${playlists}">
+                <a th:href="'/playlists/' + ${p.id}">
+                    <span class="playlist-name" th:text="${p.name}">Favorites</span>
+                    <span class="playlist-count" th:text="${p.movieCount} + ' movie' + (${p.movieCount} == 1 ? '' : 's')">12 movies</span>
+                </a>
+            </li>
+        </ul>
+        <div class="empty-list" th:hidden="${!playlists.isEmpty()}">
+            <p>No playlists yet.</p>
+            <p>Create one to group movies you want to keep together.</p>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

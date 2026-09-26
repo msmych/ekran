@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> **Status: historical.** This is the original Step 1 implementation plan; the codebase has since grown well past it (auth, marks, playlists, many more templates — see `architecture.md` and `routes-and-views.md` for the current truth). Kept for the design rationale, not as a layout reference.
+
 Ordered sequence; each step ends in a runnable/testable state. Smallest coherent version first; boring explicit code; no speculative abstraction.
 
 ## Project layout

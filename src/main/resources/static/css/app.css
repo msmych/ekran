@@ -63,7 +63,8 @@ body {
     background: #fff;
 }
 
-#search-input:focus {
+#search-input:focus,
+.auth-form input[type="email"]:focus {
     outline: 2px solid var(--accent);
     outline-offset: -1px;
     border-color: transparent;
@@ -216,12 +217,7 @@ body {
     display: block;
 }
 
-.result .meta {
-    display: block;
-    color: var(--muted);
-    font-size: 13px;
-}
-
+.result .meta,
 .result .original-title {
     display: block;
     color: var(--muted);
@@ -254,8 +250,15 @@ body {
     margin: 0;
 }
 
-.marked-link {
+/* header: logo left, [marked · account · search] clustered on the right */
+.header-actions {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.marked-link {
     font-size: 14px;
     color: var(--muted);
     text-decoration: none;
@@ -1099,4 +1102,191 @@ kbd {
     .marked-list .card-print-extra span {
         display: block;
     }
+}
+
+/* transient confirmation, e.g. after local marks are migrated to the account */
+.app-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* movie page: playlist membership chips under the mark toggle */
+.movie-playlists-row {
+    margin-top: 10px;
+}
+
+.movie-playlists {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.playlist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    cursor: pointer;
+}
+
+.playlist-chip:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.playlist-chip.on {
+    color: var(--text);
+    border-color: var(--text);
+}
+
+.playlist-chip .chip-x {
+    font-size: 11px;
+    line-height: 1;
+}
+
+/* account menu: marked + playlists links */
+.account-marked,
+.account-playlists {
+    display: block;
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: none;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.account-marked:hover,
+.account-playlists:hover {
+    color: var(--accent);
+}
+
+/* playlist selector dialog */
+.playlist-select .dialog-head {
+    padding: 16px 16px 0;
+}
+
+.playlist-picker {
+    list-style: none;
+    margin: 12px 16px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.playlist-picker .pick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: none;
+    font-size: 14px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.playlist-picker .pick:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.playlist-picker .pick.on {
+    border-color: var(--text);
+    background: var(--bg);
+}
+
+.playlist-picker .pick-mark {
+    color: var(--accent);
+}
+
+.playlist-picker .pick-empty {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.playlist-select .pick-new {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+.playlist-select .pick-new input[type="text"] {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+/* playlist index */
+.playlist-index {
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.playlist-index a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+}
+
+.playlist-index a:hover .playlist-name {
+    color: var(--accent);
+}
+
+.playlist-index .playlist-count {
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.playlist-new-form,
+.playlist-rename-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.playlist-new-form input[type="text"],
+.playlist-rename-form input[type="text"] {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.playlist-actions {
+    flex-wrap: wrap;
+}
+
+.chip-button.danger:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }

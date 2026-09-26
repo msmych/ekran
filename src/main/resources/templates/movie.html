@@ -28,15 +28,21 @@
                        th:text="'Trailers (' + ${#lists.size(vm.videos())} + ')'">Trailers</a>
                     <button type="button"
                             class="mark-toggle"
+                            th:classappend="${marked} ? 'marked'"
                             data-mark-button
                             aria-label="Mark movie (m)"
-                            aria-pressed="false"
-                            th:attr="data-movie-id=${vm.tmdbId()}">
+                            th:attr="aria-pressed=${marked} ? 'true' : 'false', data-movie-id=${vm.tmdbId()}">
                         <th:block th:replace="~{bookmark-icon :: icon(18)}"></th:block>
                     </button>
                 </div>
+                <div class="movie-playlists-row">
+                    <div th:replace="~{playlist-chips :: chips(${memberships}, ${vm.tmdbId()}, false)}"></div>
+                </div>
             </div>
         </header>
+        <th:block th:if="${memberships != null}">
+            <th:block th:replace="~{playlist-dialog :: playlistDialog}"></th:block>
+        </th:block>
         <p class="overview" th:if="${vm.overview() != null}" th:text="${vm.overview()}">Overview</p>
         <section class="credits">
             <div th:if="${!vm.directors().isEmpty()}">

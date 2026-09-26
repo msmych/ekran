@@ -131,16 +131,16 @@ public class PgAuthRepository implements AuthRepository {
     }
 
     @Override
-    public Optional<String> findSessionEmail(String sessionIdHash, Instant now) {
+    public Optional<AuthRepository.SessionUser> findSession(String sessionIdHash, Instant now) {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement("""
-                 SELECT u.email FROM sessions s
+                 SELECT u.id, u.email FROM sessions s
                  JOIN users u ON u.id = s.user_id
                  WHERE s.id = ? AND s.expires_at > ?""")) {
             ps.setString(1, sessionIdHash);
             ps.setObject(2, ts(now));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? Optional.of(rs.getString(1)) : Optional.empty();
+                return rs.next() ? Optional.of(new AuthRepository.SessionUser(rs.getLong(1), rs.getString(2))) : Optional.empty();
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Cannot look up session: " + e.getMessage(), e);

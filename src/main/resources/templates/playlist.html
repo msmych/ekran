@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{head :: head('Marked — ekran')}"></head>
+<head th:replace="~{head :: head(${name} + ' — ekran')}"></head>
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
 <script defer src="/js/qrcode.js"></script>
@@ -8,30 +8,25 @@
     <div th:replace="~{header :: header(false)}"></div>
     <section class="marked-list">
         <div class="list-head">
-            <!-- the pencil lives INSIDE the title, right after the name (a sibling
-                 button used to float mid-row: .list-head is space-between, so it
-                 never sat next to the name). Both the text and the pencil start
-                 the inline rename; the input is aligned to the title text -->
-            <h2 data-list-title>
-                <span data-list-title-text th:text="${title}">Marked movies</span>
-                <button type="button" class="list-name-edit" data-list-name-edit aria-label="Rename list"
-                        th:hidden="${cards.isEmpty()}">
+            <h2><span th:text="${name}">Playlist</span>
+                <button type="button" class="list-name-edit" data-rename-toggle aria-label="Rename playlist">
                     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                         <path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/>
                     </svg>
                 </button>
             </h2>
-            <input type="text" class="list-name-input" data-list-name-input maxlength="60" aria-label="List name" hidden>
-            <div class="list-actions">
+            <div class="list-actions playlist-actions">
                 <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <button type="button" class="chip-button" th:if="${userId != null && !cards.isEmpty()}"
-                        data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
-                        hx-target="#playlist-select-body"
-                        hx-swap="innerHTML">Add to playlist</button>
-                <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
-                <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
+                <form method="post" th:action="'/playlists/' + ${id} + '/rename'" class="playlist-rename-form"
+                      data-rename-form hidden>
+                    <input type="text" name="name" maxlength="60" th:value="${name}" aria-label="Playlist name" required>
+                    <button type="submit" class="chip-button">Save</button>
+                </form>
+                <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
+                      hx-confirm="Delete this playlist? Its movies stay in your marks.">
+                    <button type="submit" class="chip-button danger">Delete</button>
+                </form>
             </div>
         </div>
         <ul class="movie-cards">
@@ -40,10 +35,10 @@
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">
-            <p>No marked movies yet.</p>
-            <p>Search for a movie and mark it to build a list.</p>
+            <p>This playlist is empty.</p>
+            <p>Add movies to it from their pages.</p>
         </div>
-        <dialog id="share">
+        <dialog id="share" th:attr="data-share-url=@{/list(movie=${movieIds},name=${name})}">
             <div class="dialog-head">
                 <h2>Share</h2>
                 <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
@@ -54,7 +49,6 @@
                 <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
             </div>
         </dialog>
-        <th:block th:replace="~{playlist-dialog :: playlistDialog}"></th:block>
     </section>
 </main>
 <footer th:replace="~{footer :: footer}"></footer>

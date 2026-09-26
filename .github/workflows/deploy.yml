@@ -92,8 +92,13 @@ jobs:
               if [ -n "$PREV_IMAGE" ]; then
                 echo "rolling back to $PREV_IMAGE"
                 APP_IMAGE="$PREV_IMAGE" docker compose up -d app
-                curl -fsS http://127.0.0.1:8080/health
+                timeout 30s sh -c 'until curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; do sleep 2; done' \
+                  || echo "rollback health check also failed for $PREV_IMAGE"
               fi
+              # reload even on failure: the recreated app container has a new IP, and nginx
+              # resolves upstream names only at startup/reload — without this a failed
+              # deploy leaves the site 502ing on the stale address
+              APP_IMAGE="${PREV_IMAGE:-$NEW_IMAGE}" docker compose exec -T nginx nginx -s reload
               exit 1
             fi
 

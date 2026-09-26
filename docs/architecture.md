@@ -29,8 +29,15 @@ uk.matvey.ekran
 │   ├── SearchRoutes        — / and /search
 │   ├── MovieRoutes         — /movies/{id}
 │   ├── PersonRoutes        — /persons/{id}, /persons/{id}/{department}
+│   ├── ListRoutes          — /list, /list/card (public shared-list snapshot)
+│   ├── AuthRoutes          — /signin, /auth/link, /signout, /account (magic-link auth)
+│   ├── MarkedRoutes        — /marked and the mark-sync endpoints (authed)
+│   ├── PlaylistRoutes      — /playlists CRUD + membership (authed)
 │   ├── viewmodels/         — SearchResultsVm, MovieDetailVm, PersonPageVm, FilmographySectionVm, MovieCardVm, ResultItemVm, OgVm, …
 │   └── EkranApp            — app assembly, error handlers → friendly error fragments/pages
+├── auth/                    — magic-link tokens, server-side sessions, rate limiting (JDBC)
+├── marks/                   — MarksService, MarksRepository → PgMarksRepository (marked_movies)
+├── playlists/               — PlaylistsService, PlaylistsRepository → PgPlaylistsRepository (playlists, playlist_movies)
 ├── service/
 │   ├── SearchService       — query validation, movie search
 │   ├── MovieService        — movie detail assembly
@@ -41,6 +48,7 @@ uk.matvey.ekran
 │   ├── MovieRepository
 │   ├── PersonRepository
 │   └── SearchRepository
+├── db/                     — DbMigrations (V<n>.sql runner), DataSources (Hikari)
 └── tmdb/
     ├── TmdbClient          — HTTP, auth, timeouts, retries-as-configured
     ├── TmdbMovieRepository — implements MovieRepository
@@ -105,7 +113,7 @@ Javalin with routes(services, thymeleaf)
 | JSON | Jackson (databind + jdk8/params-names as needed) | Required for TMDB responses |
 | Logging | SLF4J + Logback | Locked decision; simple console/file config, no ceremony |
 | Outbound HTTP | `java.net.http.HttpClient` | Zero extra dependency, supports connect timeout, connection reuse, and per-request timeouts |
-| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~450 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
+| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~660 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
 | Build | Gradle, `application` plugin | Locked decision |
 | Tests | JUnit 5, AssertJ, MockWebServer (OkHttp) or similar stub HTTP server | Mockable TMDB, no real API key |
 

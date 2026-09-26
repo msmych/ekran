@@ -5,6 +5,9 @@ import java.util.Optional;
 
 public interface AuthRepository {
 
+    record SessionUser(long userId, String email) {
+    }
+
     Optional<Long> findUserIdByEmail(String email);
 
     /** Creates the user; on a concurrent-insert race for the same email, returns the existing id. */
@@ -20,7 +23,7 @@ public interface AuthRepository {
     /** Inserts the session, opportunistically deleting expired sessions on the same connection. */
     void insertSession(long userId, String sessionIdHash, Instant expiresAt, Instant now);
 
-    Optional<String> findSessionEmail(String sessionIdHash, Instant now);
+    Optional<SessionUser> findSession(String sessionIdHash, Instant now);
 
     boolean deleteSession(String sessionIdHash);
 }

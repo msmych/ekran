@@ -19,6 +19,10 @@ import uk.matvey.ekran.domain.TmdbUnavailableException;
 import uk.matvey.ekran.auth.AuthService;
 import uk.matvey.ekran.auth.CapturingEmailService;
 import uk.matvey.ekran.auth.InMemoryAuthRepository;
+import uk.matvey.ekran.marks.InMemoryMarksRepository;
+import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
+import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.repository.MovieRepository;
 import uk.matvey.ekran.repository.PersonRepository;
 import uk.matvey.ekran.repository.SearchRepository;
@@ -676,7 +680,8 @@ class RoutesTest {
                 // boosted anchors freeze their href at htmx process time,
                 // which sent stale mark lists on click (bug seen in prod)
                 var body = http.get(path).body().string();
-                assertThat(body).contains("data-marked-link hx-boost=\"false\">Marked");
+                assertThat(body).contains("data-marked-link");
+                assertThat(body).contains("hx-boost=\"false\">Marked");
                 assertThat(body).doesNotContain("data-marked-link hidden");
                 assertThat(body).contains("data-marked-count");
             }
@@ -899,6 +904,8 @@ assertThat(body).contains("href=\"/movies/348\"");
                 Duration.ofDays(30),
                 false,
                 Clock.systemUTC()),
+            new MarksService(new InMemoryMarksRepository()),
+            new PlaylistsService(new InMemoryPlaylistsRepository()),
             true,
             null
         );

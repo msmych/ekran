@@ -2,19 +2,30 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div class="header-row" th:classappend="${live} ? 'home-header-row'" th:fragment="header(live)">
+    <!-- the authenticated marks seed: marked.js switches to server-backed marking
+         when this element exists; ids live in PostgreSQL, localStorage is untouched -->
+    <span th:if="${userId != null}" data-authenticated th:attr="data-marked-ids=${markedIdsCsv}" hidden></span>
     <h1 class="logo"><a href="/">ekran</a></h1>
-    <a class="marked-link" href="/list" data-marked-link hx-boost="false">Marked · <span data-marked-count>0</span></a>
-    <a class="signin-link" th:if="${userEmail == null}" th:href="@{/signin(next=${currentPath})}">Sign in</a>
-    <details class="account" th:if="${userEmail != null}" data-account-menu>
-        <summary class="signin-link">Account</summary>
-        <div class="account-menu">
-            <div class="account-email" th:text="${userEmail}">email</div>
-            <form method="post" action="/signout" hx-boost="false">
-                <input type="hidden" name="next" th:value="${currentPath}">
-                <button class="account-signout" type="submit">Sign out</button>
-            </form>
-        </div>
-    </details>
+    <div class="header-actions">
+        <!-- anonymous: the marked link is the list entry point; signed in it
+             lives in the account popup instead -->
+        <a class="marked-link" th:if="${userEmail == null}" href="/list" data-marked-link
+           hx-boost="false">Marked · <span data-marked-count>0</span></a>
+        <a class="signin-link" th:if="${userEmail == null}" th:href="@{/signin(next=${currentPath})}">Sign in</a>
+        <details class="account" th:if="${userEmail != null}" data-account-menu>
+            <summary class="signin-link">Account</summary>
+            <div class="account-menu">
+                <div class="account-email" th:text="${userEmail}">email</div>
+                <a class="account-marked" href="/marked" data-marked-link hx-boost="false"
+                   th:hidden="${#strings.isEmpty(markedIdsCsv)}">Marked · <span data-marked-count>0</span></a>
+                <a class="account-playlists" href="/playlists">Playlists</a>
+                <form method="post" action="/signout" hx-boost="false">
+                    <input type="hidden" name="next" th:value="${currentPath}">
+                    <button class="account-signout" type="submit">Sign out</button>
+                </form>
+            </div>
+        </details>
+    </div>
     <th:block th:replace="~{searchbar :: searchbar(${live})}"></th:block>
 </div>
 </body>

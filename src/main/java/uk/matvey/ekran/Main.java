@@ -14,6 +14,10 @@ import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.db.DataSources;
 import uk.matvey.ekran.db.DbMigrations;
 import uk.matvey.ekran.email.ResendEmailService;
+import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.marks.PgMarksRepository;
+import uk.matvey.ekran.playlists.PgPlaylistsRepository;
+import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.service.PersonService;
 import uk.matvey.ekran.service.SearchService;
@@ -54,6 +58,8 @@ public class Main {
             new MovieService(new TmdbMovieRepository(tmdbClient, mapper)),
             new PersonService(new TmdbPersonRepository(tmdbClient, mapper)),
             authService,
+            new MarksService(new PgMarksRepository(dataSource)),
+            new PlaylistsService(new PgPlaylistsRepository(dataSource)),
             config.secureCookies(),
             dataSource
         );

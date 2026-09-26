@@ -105,8 +105,8 @@ public class AuthService {
         });
     }
 
-    public Optional<String> userEmailFor(String rawSessionId) {
-        return repository.findSessionEmail(Tokens.sha256(rawSessionId), clock.instant());
+    public Optional<AuthRepository.SessionUser> sessionUser(String rawSessionId) {
+        return repository.findSession(Tokens.sha256(rawSessionId), clock.instant());
     }
 
     public void signOut(String rawSessionId) {

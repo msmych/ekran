@@ -4,7 +4,8 @@ Quick movie search — a fast, no-bloat movie discovery web app. Open the site, 
 appear as you type, open a movie, jump to a director's/actor's/writer's filmography.
 
 Step 1 is TMDB-backed: Javalin (no Spring), server-rendered Thymeleaf + HTMX, no frontend framework.
-The only persistence is auth state (users, magic-link tokens, sessions in PostgreSQL). See [`docs/`](docs/) for the
+Persistence is PostgreSQL: auth state (users, magic-link tokens, sessions), and — once signed in —
+marks and playlists (anonymous marks stay `localStorage`-only). See [`docs/`](docs/) for the
 full spec; the deployment plan is documented in the Deployment section below and in [`docs/configuration-and-ops.md`](docs/configuration-and-ops.md).
 
 ## Requirements
@@ -58,16 +59,20 @@ links point at localhost.
 ## Test
 
 ```bash
-./gradlew test      # unit + route/integration tests; the PgAuthRepositoryTest cases need Docker (Testcontainers)
+./gradlew test      # unit + route/integration tests; the Pg*RepositoryTest cases need Docker (Testcontainers)
 ./gradlew check
 ```
 
 ## Authentication
 
 Email magic link only — no passwords, no separate registration (a first sign-in creates
-the account). `Sign in` in the header is deliberately small: the app stays fully usable
-anonymously (marks/sharing/printing are localStorage-only and unchanged). After
-signing in the header shows an `Account` menu with the email and `Sign out`.
+the account). The sign-in page says it upfront: search, marking and sharing work without
+an account; signing in adds playlists and server-side marks. `Sign in` in the header is
+deliberately small (header layout: `ekran · [Marked, Sign in/Account] · search`, clustered
+right). After signing in the header shows an `Account` popup with the email, `Marked · N`
+(hidden at zero marks), `Playlists` and `Sign out`; marks move to
+PostgreSQL (local marks are migrated on first load and only cleared after the server
+confirms; the merge is idempotent, so magic links opened elsewhere are safe).
 
 ```
 POST /signin            email → one-time token (SHA-256-hashed in Postgres, 15 min TTL,
@@ -94,6 +99,10 @@ shows the email and a sign-out button (logout deletes the server-side session).
 | `/list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, no accounts; the Share chip opens a QR dialog with a copyable link |
 | `/list/card?movie={id}` | HTMX-only single-card fragment (used when marking from the search overlay while viewing `/list`) |
 | `/signin` · `/signin/sent` · `/auth/link?token=…` | Passwordless email sign-in (magic link) |
+| `/marked` | Signed-in: your marked movies (server-persisted). The header `Marked · N` points here instead of `/list` |
+| `/marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` | Mark sync endpoints (authed; bulk POST is the idempotent local→server merge) |
+| `/playlists` · `/playlists/{id}` | Signed-in playlist index and detail (rename/delete/Share/Print) |
+| `/playlists/select?movie={id}…` · `/playlists/{id}/movies…` | HTMX fragment for the "Add to playlist" dialog + membership mutations |
 | `/account` | Minimal account page (email + sign out) |
 | `/about` | About page |
 | `/videos/{key}` | HTMX-only YouTube player fragment (used by the movie page) |
@@ -152,12 +161,12 @@ Movie and person pages also link to the corresponding `themoviedb.org` page
 ```
 web       Javalin routes, view models, Thymeleaf templates (+ auth session middleware)
   ↓
-service   search / movie / person application logic
+service   search / movie / person application logic      marks / playlists services
 auth      magic-link tokens, server-side sessions, rate limiting
   ↓
 email     EmailService abstraction → ResendEmailService → Resend API
   ↓
-repository  interfaces for movie/person/search retrieval        auth repository (JDBC)
+repository  interfaces for movie/person/search retrieval        marks / playlists / auth repositories (JDBC)
   ↓
 tmdb      TMDB client, API DTOs, mapping into domain models    db: migrations + Hikari pool
 ```
@@ -182,15 +191,25 @@ closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywher
 are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
 [about page](/about) is linked from the footer. App JavaScript is just vendored
 `htmx.min.js` (2.0.4) plus two first-party files: a ~280-line `search.js` (hotkeys,
-Escape, click-away, keyboard nav) and a ~450-line `marked.js` (marking + share/QR).
+Escape, click-away, keyboard nav) and a ~660-line `marked.js` (marking + share/QR).
 
-Movies can be **marked** (anonymous, `localStorage`-only — no accounts, no server state)
-via the bookmark toggle on the movie page, on any movie card, or straight from search
-results (`m` works too). The header shows `Marked · N` (hidden until your first mark),
-and that link (`/list?movie=…`) *is* the list — name it, share it as-is or via the QR
-dialog on `/list`, print it (with original titles and directors), or clear it there
-(after a confirm). A shared URL opened elsewhere reads "Shared list" with an
-"Add all to marked" button — it never imports silently.
+Movies can be **marked** via the bookmark toggle on the movie page, on any movie card, or
+straight from search results (`m` works too). Anonymous marks live in `localStorage` only;
+signed-in marks live in PostgreSQL (`marked_movies`, migrated from localStorage on first
+authenticated load — additive and idempotent). The header shows `Marked · N` (hidden until
+your first mark): for anonymous users it opens `/list?movie=…` (the URL *is* the list —
+share it as-is or via the QR dialog, print it with original titles and directors, clear it
+after a confirm); for signed-in users it opens `/marked` (Share/Print/Clear there).
+
+A shared URL opened elsewhere reads "Shared list" with an "Add all to marked" button — it
+never imports silently (for signed-in users that button persists the bulk via the server).
+
+Signed-in users can also group movies into **playlists** (`playlists` + `playlist_movies`
+in PostgreSQL, ordered by insert position): the `Add to playlist` dialog on movie pages
+and lists lets them create playlists, toggle membership, or bulk-add the whole shared
+list. Playlists are ownership-scoped (another user's playlist behaves as 404); membership
+is independent of marks — unmarking never removes from a playlist. A playlist's Share
+link is just `/list?movie=…&name=…`, so it renders for anyone, no account needed.
 
 ## Project layout
 
@@ -200,6 +219,8 @@ src/main/java/uk/matvey/ekran/
 ├── config/          AppConfig (env parsing, validation)
 ├── web/             routes, viewmodels, error handling, auth middleware
 ├── auth/            AuthService, tokens/hashing, rate limiting, PgAuthRepository
+├── marks/           MarksService, MarksRepository → PgMarksRepository
+├── playlists/       PlaylistsService, PlaylistsRepository → PgPlaylistsRepository
 ├── email/           EmailService → ResendEmailService, magic-link email
 ├── db/              DbMigrations (V<n>.sql runner), DataSources (Hikari)
 ├── service/         SearchService, MovieService, PersonService

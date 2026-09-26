@@ -55,7 +55,7 @@ class PgAuthRepositoryTest {
     void migrationsAreIdempotent() {
         DbMigrations.migrate(dataSource);
 
-        assertThat(migrationCount()).isEqualTo(3);
+        assertThat(migrationCount()).isEqualTo(5);
     }
 
     @Test
@@ -113,14 +113,14 @@ class PgAuthRepositoryTest {
 
         repository.insertSession(userId, sessionHash, expiresAt, NOW);
 
-        assertThat(repository.findSessionEmail(sessionHash, NOW.plusSeconds(1))).contains("session@bar.com");
+        assertThat(repository.findSession(sessionHash, NOW.plusSeconds(1)).map(AuthRepository.SessionUser::email)).contains("session@bar.com");
         // expiry is strict
-        assertThat(repository.findSessionEmail(sessionHash, expiresAt)).isEmpty();
-        assertThat(repository.findSessionEmail(Tokens.sha256("unknown-session"), NOW)).isEmpty();
+        assertThat(repository.findSession(sessionHash, expiresAt)).isEmpty();
+        assertThat(repository.findSession(Tokens.sha256("unknown-session"), NOW)).isEmpty();
 
         assertThat(repository.deleteSession(sessionHash)).isTrue();
         assertThat(repository.deleteSession(sessionHash)).isFalse();
-        assertThat(repository.findSessionEmail(sessionHash, NOW.plusSeconds(1))).isEmpty();
+        assertThat(repository.findSession(sessionHash, NOW.plusSeconds(1))).isEmpty();
     }
 
     @Test
@@ -131,7 +131,7 @@ class PgAuthRepositoryTest {
 
         repository.insertSession(userId, Tokens.sha256("live-session"), NOW.plus(Duration.ofDays(30)), NOW);
 
-        assertThat(repository.findSessionEmail(staleHash, NOW.plusSeconds(1))).isEmpty();
+        assertThat(repository.findSession(staleHash, NOW.plusSeconds(1))).isEmpty();
     }
 
     private static int migrationCount() {

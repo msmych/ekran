@@ -5,8 +5,19 @@
     var NAME_MAX = 60;
     var MAX_SHARE = 100;
     var EDITABLE = /^(INPUT|TEXTAREA|SELECT)$/;
-    var ids = load();
+    var seedEl = document.querySelector('[data-authenticated]');
+    // authenticated marks live in PostgreSQL: the server seeds the id set into
+    // the header (re-rendered on every request), mutations go through /marked,
+    // and localStorage is used exactly once — to migrate old anonymous marks
+    var AUTHENTICATED = !!seedEl;
+    var MARKED_PAGE = location.pathname === '/marked';
+    var ids = AUTHENTICATED ? loadSeed() : load();
     var copyTimer = null;
+
+    function loadSeed() {
+        var raw = seedEl ? (seedEl.getAttribute('data-marked-ids') || '') : '';
+        return raw.split(',').filter(Boolean).map(Number);
+    }
 
     function load() {
         try {
@@ -41,14 +52,98 @@
         return ids.indexOf(id) !== -1;
     }
 
+    // optimistic flip; on a failed mutation the id goes back and the UI re-syncs
     function toggle(id) {
         var at = ids.indexOf(id);
-        if (at === -1) {
+        var marked = at === -1;
+        if (marked) {
             ids.push(id);
         } else {
             ids.splice(at, 1);
         }
-        save();
+        if (AUTHENTICATED) {
+            persistMark(id, marked);
+        } else {
+            save();
+        }
+    }
+
+    function persistMark(id, marked) {
+        fetch('/marked/' + id, { method: marked ? 'POST' : 'DELETE' })
+            .then(function (response) {
+                if (!response.ok) {
+                    revert(id, marked);
+                }
+            })
+            .catch(function () {
+                revert(id, marked);
+            });
+    }
+
+    function revert(id, marked) {
+        var at = ids.indexOf(id);
+        if (marked && at !== -1) {
+            ids.splice(at, 1);
+        } else if (!marked && at === -1) {
+            ids.push(id);
+        }
+        if (!marked && MARKED_PAGE) {
+            var card = document.querySelector('.movie-cards li[data-movie-id="' + id + '"]');
+            if (!card) {
+                addCard(id);
+            }
+        }
+        refresh();
+    }
+
+    function persistBulk(movieIds, method, done) {
+        var body = new URLSearchParams();
+        movieIds.forEach(function (id) {
+            body.append('movie', id);
+        });
+        fetch('/marked', { method: method, body: body })
+            .then(function (response) {
+                if (response.ok) {
+                    done();
+                }
+            })
+            .catch(function () {
+            });
+    }
+
+    // one-time migration: anonymous marks (this browser's localStorage) are merged
+    // into the account; localStorage is cleared only after the server confirmed,
+    // so a failed merge keeps them for the next attempt (idempotent union)
+    function migrateLocalMarks() {
+        var local = load();
+        if (!local.length) {
+            return;
+        }
+        persistBulk(local, 'POST', function () {
+            try {
+                localStorage.removeItem(KEY);
+                localStorage.removeItem(NAME_KEY);
+            } catch (e) {
+            }
+            local.forEach(function (id) {
+                if (ids.indexOf(id) === -1) {
+                    ids.push(id);
+                }
+            });
+            refresh();
+            toast(local.length + ' marked movie' + (local.length === 1 ? '' : 's') + ' saved to your account.');
+        });
+    }
+
+    function toast(message) {
+        var el = document.createElement('div');
+        el.className = 'app-toast';
+        el.setAttribute('role', 'status');
+        el.textContent = message;
+        document.body.appendChild(el);
+        setTimeout(function () {
+            el.remove();
+        }, 4000);
     }
 
     function storedName() {
@@ -79,6 +174,19 @@
         return name ? '/list?' + qs + '&name=' + encodeURIComponent(name) : '/list?' + qs;
     }
 
+    // the shareable snapshot of the current set: a dialog may carry its own
+// data-share-url (the playlist page shares its /list URL); on /marked that is
+// the /list URL built from the ids (the /marked URL itself carries no state);
+// on /list the URL already mirrors the view, so it shares itself
+function shareUrl() {
+        var explicit = document.querySelector('[data-share-url]');
+        if (explicit) {
+            var url = explicit.getAttribute('data-share-url');
+            return url && url.charAt(0) === '/' ? location.origin + url : url;
+        }
+        return MARKED_PAGE ? location.origin + listUrl() : location.href;
+    }
+
     function refresh() {
         var link = document.querySelector('[data-marked-link]');
         if (link) {
@@ -87,9 +195,13 @@
                 count.textContent = ids.length;
             }
             // hidden until the first mark — done from JS, never in the markup,
-            // so a stale/failed script can never hide the entry point
+            // so a stale/failed script can never hide the entry point.
+            // authenticated: the href stays /marked (the account view);
+            // anonymous: the href IS the list, built from local marks
             link.hidden = ids.length === 0;
-            link.setAttribute('href', listUrl());
+            if (!AUTHENTICATED) {
+                link.setAttribute('href', listUrl());
+            }
         }
         var button = document.querySelector('[data-mark-button]');
         if (button) {
@@ -111,6 +223,18 @@
     // "Shared list" + Add all to marked otherwise; a custom name (URL param or,
     // for your own list, the stored one) always wins over the default title
     function syncListView() {
+        if (MARKED_PAGE) {
+            // /marked is always your own set: actions depend only on card presence
+            var markedEmpty = visibleCardIds().length === 0;
+            setHidden('[data-dialog="share"]', markedEmpty);
+            setHidden('[data-print-list]', markedEmpty);
+            setHidden('[data-clear-marks]', markedEmpty);
+            var markedEmptyState = document.querySelector('.empty-list');
+            if (markedEmptyState) {
+                markedEmptyState.hidden = !markedEmpty;
+            }
+            return;
+        }
         var title = document.querySelector('[data-list-title]');
         if (!title) {
             return;
@@ -164,6 +288,9 @@
     }
 
     function syncListUrl() {
+        if (location.pathname !== '/list') {
+            return;
+        }
         var params = new URLSearchParams();
         visibleCardIds().forEach(function (id) {
             params.append('movie', id);
@@ -295,7 +422,7 @@
         if (!target || typeof qrcode === 'undefined') {
             return;
         }
-        var url = location.href;
+        var url = shareUrl();
         var qr = qrcode(0, 'M');
         qr.addData(url);
         qr.make();
@@ -316,7 +443,7 @@
         }
         var copyButton = event.target.closest('[data-qr-copy]');
         if (copyButton) {
-            copyUrl(location.href);
+            copyUrl(shareUrl());
             return;
         }
         var titleEdit = event.target.closest && event.target.closest('[data-list-title]');
@@ -335,9 +462,10 @@
             var id = Number(cardMark.getAttribute('data-card-mark'));
             var wasMarked = isMarked(id);
             toggle(id);
-            if (location.pathname === '/list') {
-                // on /list the card set is the URL — unmarking removes the card,
-                // marking from the search overlay appends it; elsewhere cards stay put
+            // on /list and /marked the card set is the user's own set — unmarking
+            // removes the card, marking from the search overlay appends it;
+            // elsewhere cards stay put
+            if (location.pathname === '/list' || MARKED_PAGE) {
                 var card = document.querySelector('.movie-cards li[data-movie-id="' + id + '"]');
                 if (card) {
                     if (wasMarked) {
@@ -352,18 +480,52 @@
         }
         var addAll = event.target.closest('[data-mark-all]');
         if (addAll) {
-            visibleCardIds().forEach(function (id) {
-                if (!isMarked(id)) {
-                    toggle(id);
-                }
+            var newIds = visibleCardIds().filter(function (id) {
+                return !isMarked(id);
             });
-            refresh();
+            if (!newIds.length) {
+                refresh();
+                return;
+            }
+            if (AUTHENTICATED) {
+                persistBulk(newIds, 'POST', function () {
+                    newIds.forEach(function (id) {
+                        if (ids.indexOf(id) === -1) {
+                            ids.push(id);
+                        }
+                    });
+                    refresh();
+                });
+            } else {
+                newIds.forEach(function (id) {
+                    ids.push(id);
+                });
+                save();
+                refresh();
+            }
             return;
         }
         var clearAll = event.target.closest('[data-clear-marks]');
         if (clearAll) {
             // clearing is instant and irreversible — the browser confirm guards it
             if (!window.confirm('Clear all marked movies from this list?')) {
+                return;
+            }
+            if (AUTHENTICATED) {
+                persistBulk(ids.slice(), 'DELETE', function () {
+                    ids = [];
+                    document.querySelectorAll('.movie-cards li').forEach(function (li) {
+                        li.remove();
+                    });
+                    try {
+                        localStorage.removeItem(NAME_KEY);
+                    } catch (e) {
+                    }
+                    if (!MARKED_PAGE) {
+                        history.replaceState(null, '', '/list');
+                    }
+                    refresh();
+                });
                 return;
             }
             visibleCardIds().forEach(function (id) {
@@ -386,6 +548,16 @@
         if (print) {
             window.print();
         }
+        // playlist page: the rename form stays hidden until asked for
+        var renameToggle = event.target.closest('[data-rename-toggle]');
+        if (renameToggle) {
+            var form = document.querySelector('[data-rename-form]');
+            if (form) {
+                renameToggle.hidden = true;
+                form.hidden = false;
+                form.querySelector('input').focus();
+            }
+        }
     });
 
     // `m` toggles the displayed movie; physical key code so it also
@@ -398,6 +570,18 @@
                 commitNameEdit(false);
             } else if (event.key === 'Escape') {
                 commitNameEdit(true);
+            }
+            return;
+        }
+        var renameForm = event.target.closest('[data-rename-form]');
+        if (renameForm) {
+            if (event.key === 'Escape') {
+                renameForm.hidden = true;
+                var renameToggle = document.querySelector('[data-rename-toggle]');
+                if (renameToggle) {
+                    renameToggle.hidden = false;
+                    renameToggle.focus();
+                }
             }
             return;
         }
@@ -422,8 +606,12 @@
         }
     });
 
-    // other tabs: stay in sync with their marks and the list name
+    // other tabs: stay in sync with their marks and the list name (anonymous mode
+    // only — authenticated marks have no local counterpart to sync)
     window.addEventListener('storage', function (event) {
+        if (AUTHENTICATED) {
+            return;
+        }
         if (event.key === NAME_KEY) {
             refresh();
             return;
@@ -435,17 +623,44 @@
         refresh();
     });
 
+    function reseedFromServer() {
+        fetch('/marked/ids')
+            .then(function (response) {
+                return response.ok ? response.text() : '';
+            })
+            .then(function (text) {
+                ids = text.split(',').filter(Boolean).map(Number);
+                refresh();
+            })
+            .catch(function () {
+            });
+    }
+
     // bfcache restore: the page comes back exactly as it was left — no
     // scripts re-run and no storage event fires — so a page kept open while
     // marks were made elsewhere would otherwise carry a stale href/count
     window.addEventListener('pageshow', function (event) {
         if (event.persisted) {
-            ids = load();
-            refresh();
+            if (AUTHENTICATED) {
+                reseedFromServer();
+            } else {
+                ids = load();
+                refresh();
+            }
         }
     });
 
-    // boosted navigation re-renders the header and movie actions
-    document.addEventListener('htmx:afterSwap', refresh);
+    // boosted navigation re-renders the header and movie actions; the fresh
+    // header carries the current server-side mark set
+    document.addEventListener('htmx:afterSwap', function () {
+        if (AUTHENTICATED) {
+            seedEl = document.querySelector('[data-authenticated]');
+            ids = loadSeed();
+        }
+        refresh();
+    });
     refresh();
+    if (AUTHENTICATED) {
+        migrateLocalMarks();
+    }
 })();

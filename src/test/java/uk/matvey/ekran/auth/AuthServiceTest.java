@@ -56,7 +56,7 @@ class AuthServiceTest {
         assertThat(session.id()).isNotBlank();
         // the stored session key is the hash, never the raw cookie value
         assertThat(repository.hasSessionForRaw(session.id())).isTrue();
-        assertThat(auth.userEmailFor(session.id())).contains("foo@bar.com");
+        assertThat(auth.sessionUser(session.id()).map(AuthRepository.SessionUser::email)).contains("foo@bar.com");
         assertThat(session.expiresAt()).isEqualTo(clock.instant().plus(Duration.ofDays(30)));
     }
 
@@ -86,7 +86,7 @@ class AuthServiceTest {
 
         clock.advance(Duration.ofDays(30));
 
-        assertThat(auth.userEmailFor(session.id())).isEmpty();
+        assertThat(auth.sessionUser(session.id())).isEmpty();
     }
 
     @Test
@@ -126,7 +126,7 @@ class AuthServiceTest {
 
         auth.signOut(session.id());
 
-        assertThat(auth.userEmailFor(session.id())).isEmpty();
+        assertThat(auth.sessionUser(session.id())).isEmpty();
     }
 
     @Test

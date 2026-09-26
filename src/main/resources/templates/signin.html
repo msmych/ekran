@@ -7,6 +7,10 @@
     <div th:replace="~{header :: header(false)}"></div>
     <article class="auth-card">
         <h2>Sign in to ekran</h2>
+        <p class="auth-note">You probably don't need an account — search, marking and sharing all work
+            anonymously, and you may be perfectly comfortable without one.</p>
+        <p class="auth-note">Signing in keeps your marks on the server and adds playlists —
+            the only account features so far.</p>
         <p class="auth-note">Enter your email and we'll send you a magic link.</p>
         <p class="auth-error" th:if="${error != null}" th:text="${error}">error</p>
         <form class="auth-form" method="post" action="/signin" hx-boost="false">

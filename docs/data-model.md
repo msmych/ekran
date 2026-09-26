@@ -80,7 +80,18 @@ Templates bind to view models only, never domain records directly, so display fo
 
 ## Step 2: PostgreSQL / local knowledge base (design target, not MVP work)
 
-The repository boundary above is designed so this lands later without touching `service/` or `web/`. Intended schema:
+**Landed first (auth + user data):** `users`, `login_tokens` (SHA-256-hashed, TTL, single-use), `sessions` (the session id column stores a hash of the cookie value — see `configuration-and-ops.md`), plus the marked/playlist tables:
+
+```sql
+marked_movies   -- user_id, movie_id (tmdb), created_at; PK (user_id, movie_id)
+playlists       -- id, user_id, name (≤60, not unique), created_at, updated_at; indexed by user_id
+playlist_movies -- playlist_id, movie_id (tmdb), position (MAX+1 on insert), created_at;
+                  PK (playlist_id, movie_id), UNIQUE (playlist_id, position)
+```
+
+Movie references are TMDB IDs stored directly (`BIGINT`) — no local movies table yet, so marks/playlists are verified only by format (`[1-9][0-9]{0,9}`), resolved through TMDB at render time. All queries are scoped by `user_id` from the session; a foreign playlist id is a 404, not a leak.
+
+The repository boundary above is designed so the knowledge base lands later without touching `service/` or `web/`. Intended schema:
 
 ```sql
 movies          -- canonical movie metadata + tmdb_id (unique)

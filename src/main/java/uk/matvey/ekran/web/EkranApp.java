@@ -3,6 +3,7 @@ package uk.matvey.ekran.web;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
@@ -21,6 +22,8 @@ import uk.matvey.ekran.auth.AuthService;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
+import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.service.PersonService;
 import uk.matvey.ekran.service.SearchService;
@@ -39,6 +42,8 @@ public final class EkranApp {
         MovieService movieService,
         PersonService personService,
         AuthService authService,
+        MarksService marksService,
+        PlaylistsService playlistsService,
         boolean secureCookies,
         DataSource dataSource
     ) {
@@ -66,12 +71,14 @@ public final class EkranApp {
         // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
         // and serves stale JS after deploys — mismatched markup/JS versions follow)
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
-        app.before(ctx -> resolveCurrentUser(ctx, authService));
+        app.before(ctx -> resolveCurrentUser(ctx, authService, marksService));
         new SearchRoutes(searchService).register(app);
-        new MovieRoutes(movieService).register(app);
+        new MovieRoutes(movieService, playlistsService).register(app);
         new PersonRoutes(personService).register(app);
         new ListRoutes(movieService).register(app);
         new AuthRoutes(authService, secureCookies).register(app);
+        new MarkedRoutes(marksService, movieService).register(app);
+        new PlaylistRoutes(playlistsService, movieService, marksService).register(app);
         app.get("/about", ctx -> ctx.render("about"));
         app.get("/videos/{key}", ctx -> {
             var key = ctx.pathParam("key");
@@ -89,24 +96,38 @@ public final class EkranApp {
         return app;
     }
 
-    // userEmail/currentPath come from the session middleware, not from per-route
-    // models — the header needs them on every page (Sign in link vs account menu)
+    // userEmail/currentPath/marked seed come from the session middleware, not from
+    // per-route models — the header needs them on every page (Sign in link vs
+    // account menu, and marked.js needs the server-side mark set when authenticated)
     private static FileRenderer mergeAuthModel(FileRenderer delegate) {
         return (filePath, model, ctx) -> {
             var merged = new HashMap<String, Object>(model);
             merged.put("userEmail", ctx.<String>attribute("userEmail"));
             merged.put("currentPath", ctx.<String>attribute("currentPath"));
+            merged.put("userId", ctx.<Long>attribute("userId"));
+            merged.put("markedIdsCsv", ctx.<String>attribute("markedIdsCsv"));
             return delegate.render(filePath, merged, ctx);
         };
     }
 
-    private static void resolveCurrentUser(Context ctx, AuthService authService) {
+    private static void resolveCurrentUser(Context ctx, AuthService authService, MarksService marksService) {
         var uri = ctx.req().getRequestURI();
         var query = ctx.req().getQueryString();
-        ctx.attribute("currentPath", query == null ? uri : uri + "?" + query);
+        // the sign-in/sign-out continuation: the plain path — except on /list,
+        // where the query string IS the content (a shared list signed into
+        // from must not lose its movies)
+        ctx.attribute("currentPath", query != null && "/list".equals(uri) ? uri + "?" + query : uri);
         var sessionId = ctx.cookie(authService.sessionCookieName());
         if (sessionId != null) {
-            authService.userEmailFor(sessionId).ifPresent(email -> ctx.attribute("userEmail", email));
+            authService.sessionUser(sessionId).ifPresent(user -> {
+                ctx.attribute("userId", user.userId());
+                ctx.attribute("userEmail", user.email());
+                var markedIds = marksService.markedMovieIds(user.userId());
+                ctx.attribute("markedIds", markedIds);
+                ctx.attribute("markedIdsCsv", markedIds.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+            });
         }
     }
 
