@@ -29,6 +29,13 @@ public class InMemoryPlaylistsRepository implements PlaylistsRepository {
     }
 
     @Override
+    public long playlistsCount(long userId) {
+        return playlists.values().stream()
+            .filter(p -> p.userId() == userId)
+            .count();
+    }
+
+    @Override
     public Optional<PlaylistDetail> playlist(long userId, long playlistId) {
         var playlist = playlists.get(playlistId);
         if (playlist == null || playlist.userId() != userId) {

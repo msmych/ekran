@@ -71,7 +71,7 @@ public final class EkranApp {
         // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
         // and serves stale JS after deploys — mismatched markup/JS versions follow)
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
-        app.before(ctx -> resolveCurrentUser(ctx, authService, marksService));
+        app.before(ctx -> resolveCurrentUser(ctx, authService, marksService, playlistsService));
         new SearchRoutes(searchService).register(app);
         new MovieRoutes(movieService, playlistsService).register(app);
         new PersonRoutes(personService).register(app);
@@ -106,11 +106,12 @@ public final class EkranApp {
             merged.put("currentPath", ctx.<String>attribute("currentPath"));
             merged.put("userId", ctx.<Long>attribute("userId"));
             merged.put("markedIdsCsv", ctx.<String>attribute("markedIdsCsv"));
+            merged.put("playlistsCount", ctx.<Long>attribute("playlistsCount"));
             return delegate.render(filePath, merged, ctx);
         };
     }
 
-    private static void resolveCurrentUser(Context ctx, AuthService authService, MarksService marksService) {
+    private static void resolveCurrentUser(Context ctx, AuthService authService, MarksService marksService, PlaylistsService playlistsService) {
         var uri = ctx.req().getRequestURI();
         var query = ctx.req().getQueryString();
         // the sign-in/sign-out continuation: the plain path — except on /list,
@@ -127,6 +128,7 @@ public final class EkranApp {
                 ctx.attribute("markedIdsCsv", markedIds.stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(",")));
+                ctx.attribute("playlistsCount", playlistsService.playlistsCount(user.userId()));
             });
         }
     }

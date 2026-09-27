@@ -548,14 +548,20 @@ function shareUrl() {
         if (print) {
             window.print();
         }
-        // playlist page: the rename form stays hidden until asked for
+        // playlist page: the rename form replaces the title in place until
+        // saved or cancelled — the heading hides so the form takes its slot
         var renameToggle = event.target.closest('[data-rename-toggle]');
         if (renameToggle) {
             var form = document.querySelector('[data-rename-form]');
             if (form) {
-                renameToggle.hidden = true;
+                var heading = renameToggle.closest('h2');
+                if (heading) {
+                    heading.hidden = true;
+                }
                 form.hidden = false;
-                form.querySelector('input').focus();
+                var renameInput = form.querySelector('input');
+                renameInput.focus();
+                renameInput.select();
             }
         }
     });
@@ -577,10 +583,13 @@ function shareUrl() {
         if (renameForm) {
             if (event.key === 'Escape') {
                 renameForm.hidden = true;
-                var renameToggle = document.querySelector('[data-rename-toggle]');
-                if (renameToggle) {
-                    renameToggle.hidden = false;
-                    renameToggle.focus();
+                var renameHeading = document.querySelector('.list-head h2');
+                if (renameHeading) {
+                    renameHeading.hidden = false;
+                    var renameToggle = renameHeading.querySelector('[data-rename-toggle]');
+                    if (renameToggle) {
+                        renameToggle.focus();
+                    }
                 }
             }
             return;

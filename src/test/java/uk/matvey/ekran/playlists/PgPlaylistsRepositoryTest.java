@@ -51,6 +51,7 @@ class PgPlaylistsRepositoryTest {
         var userId = authRepository.insertUser("crud@bar.com");
 
         var id = repository.createPlaylist(userId, "Watch soon");
+        assertThat(repository.playlistsCount(userId)).isEqualTo(1);
         assertThat(repository.playlists(userId))
             .singleElement()
             .satisfies(p -> {
@@ -64,6 +65,7 @@ class PgPlaylistsRepositoryTest {
 
         assertThat(repository.deletePlaylist(userId, id)).isTrue();
         assertThat(repository.playlists(userId)).isEmpty();
+        assertThat(repository.playlistsCount(userId)).isZero();
         assertThat(repository.deletePlaylist(userId, id)).isFalse();
     }
 
@@ -118,6 +120,8 @@ class PgPlaylistsRepositoryTest {
         repository.addMovie(alice, id, 238L);
 
         assertThat(repository.playlist(bob, id)).isEmpty();
+        assertThat(repository.playlistsCount(bob)).isZero();
+        assertThat(repository.playlistsCount(alice)).isEqualTo(1);
         assertThat(repository.renamePlaylist(bob, id, "Hacked")).isFalse();
         assertThat(repository.deletePlaylist(bob, id)).isFalse();
         assertThat(repository.playlistsWithMovie(bob, 238L)).isEmpty();

@@ -44,6 +44,20 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
     }
 
     @Override
+    public long playlistsCount(long userId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT count(*) FROM playlists WHERE user_id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot count playlists: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public Optional<PlaylistDetail> playlist(long userId, long playlistId) {
         String name;
         try (Connection conn = dataSource.getConnection();

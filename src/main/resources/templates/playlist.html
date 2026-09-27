@@ -15,14 +15,17 @@
                     </svg>
                 </button>
             </h2>
+            <!-- replaces the title in place while editing: the heading hides,
+                 the form takes its left slot in the space-between row -->
+            <form method="post" th:action="'/playlists/' + ${id} + '/rename'" class="playlist-rename-form"
+                  data-rename-form hidden>
+                <input type="text" name="name" maxlength="60" class="list-name-input" th:value="${name}"
+                       aria-label="Playlist name" required>
+                <button type="submit" class="chip-button">Save</button>
+            </form>
             <div class="list-actions playlist-actions">
                 <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <form method="post" th:action="'/playlists/' + ${id} + '/rename'" class="playlist-rename-form"
-                      data-rename-form hidden>
-                    <input type="text" name="name" maxlength="60" th:value="${name}" aria-label="Playlist name" required>
-                    <button type="submit" class="chip-button">Save</button>
-                </form>
                 <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
                       hx-confirm="Delete this playlist? Its movies stay in your marks.">
                     <button type="submit" class="chip-button danger">Delete</button>

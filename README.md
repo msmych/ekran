@@ -70,7 +70,7 @@ the account). The sign-in page says it upfront: search, marking and sharing work
 an account; signing in adds playlists and server-side marks. `Sign in` in the header is
 deliberately small (header layout: `ekran · [Marked, Sign in/Account] · search`, clustered
 right). After signing in the header shows an `Account` popup with the email, `Marked · N`
-(hidden at zero marks), `Playlists` and `Sign out`; marks move to
+(hidden at zero marks), `Playlists · N` and `Sign out`; marks move to
 PostgreSQL (local marks are migrated on first load and only cleared after the server
 confirms; the merge is idempotent, so magic links opened elsewhere are safe).
 

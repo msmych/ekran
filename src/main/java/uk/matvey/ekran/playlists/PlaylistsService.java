@@ -26,6 +26,10 @@ public class PlaylistsService {
         return repository.playlists(userId);
     }
 
+    public long playlistsCount(long userId) {
+        return repository.playlistsCount(userId);
+    }
+
     public Optional<PlaylistDetail> playlist(long userId, long playlistId) {
         return repository.playlist(userId, playlistId);
     }

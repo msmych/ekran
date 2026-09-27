@@ -384,6 +384,10 @@ class AuthRoutesTest {
 
             var playlistId = location.substring("/playlists/".length());
 
+            // the account popup shows the playlist count, like the marked count
+            var about = http.get("/about", r -> r.header("Cookie", cookie(sessionId)));
+            assertThat(about.body().string()).contains("Playlists · <span>1</span>");
+
             // add membership, then the detail page shows the dialog wiring
             var add = http.request("/playlists/" + playlistId + "/movies/238", r -> {
                 r.header("Cookie", cookie(sessionId));
@@ -425,6 +429,8 @@ class AuthRoutesTest {
             });
             assertThat(delete.code()).isEqualTo(303);
             assertThat(delete.header("Location")).isEqualTo("/playlists");
+            assertThat(http.get("/about", r -> r.header("Cookie", cookie(sessionId)))
+                .body().string()).contains("Playlists · <span>0</span>");
         });
     }
 

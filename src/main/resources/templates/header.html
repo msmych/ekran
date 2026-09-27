@@ -18,7 +18,7 @@
                 <div class="account-email" th:text="${userEmail}">email</div>
                 <a class="account-marked" href="/marked" data-marked-link hx-boost="false"
                    th:hidden="${#strings.isEmpty(markedIdsCsv)}">Marked · <span data-marked-count>0</span></a>
-                <a class="account-playlists" href="/playlists">Playlists</a>
+                <a class="account-playlists" href="/playlists">Playlists · <span th:text="${playlistsCount}">0</span></a>
                 <form method="post" action="/signout" hx-boost="false">
                     <input type="hidden" name="next" th:value="${currentPath}">
                     <button class="account-signout" type="submit">Sign out</button>

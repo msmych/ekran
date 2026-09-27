@@ -12,6 +12,8 @@ public interface PlaylistsRepository {
 
     List<Playlist> playlists(long userId);
 
+    long playlistsCount(long userId);
+
     Optional<PlaylistDetail> playlist(long userId, long playlistId);
 
     List<PlaylistMembership> playlistsWithMovie(long userId, long movieId);

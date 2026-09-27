@@ -1274,8 +1274,7 @@ kbd {
     align-items: center;
 }
 
-.playlist-new-form input[type="text"],
-.playlist-rename-form input[type="text"] {
+.playlist-new-form input[type="text"] {
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 8px;
