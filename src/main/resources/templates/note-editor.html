@@ -1,0 +1,17 @@
+<!-- the inline note editor: POST url saves and swaps back into the note-area
+     display; the ✕ GETs the display area back untouched. Rendered directly
+     by the note routes and never included whole by the pages -->
+<form class="card-note card-note-form" xmlns:th="http://www.thymeleaf.org"
+      method="post" th:action="${url}"
+      th:attr="hx-post=${url}"
+      hx-target="closest .card-note"
+      hx-swap="outerHTML">
+    <textarea name="note" maxlength="500" rows="2" placeholder="Why this one?"
+              aria-label="Note" th:text="${note}"></textarea>
+    <div class="card-note-actions">
+        <button type="submit" class="chip-button">Save</button>
+        <button type="button" class="card-note-cancel" data-note-cancel
+                th:attr="hx-get=${url}" hx-target="closest .card-note" hx-swap="outerHTML"
+                aria-label="Cancel">✕</button>
+    </div>
+</form>

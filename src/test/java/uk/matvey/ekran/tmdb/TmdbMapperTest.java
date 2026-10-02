@@ -1,8 +1,9 @@
 package uk.matvey.ekran.tmdb;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-
 import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.SearchType;
@@ -10,8 +11,6 @@ import uk.matvey.ekran.tmdb.dto.MovieDetailResponse;
 import uk.matvey.ekran.tmdb.dto.MovieSearchResponse;
 import uk.matvey.ekran.tmdb.dto.PersonDetailResponse;
 import uk.matvey.ekran.tmdb.dto.PersonSearchResponse;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class TmdbMapperTest {
 

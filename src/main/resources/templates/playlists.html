@@ -13,6 +13,7 @@
         <!-- the New button reveals this row; no always-visible input in the header -->
         <form method="post" action="/playlists" class="playlist-new-form" data-new-playlist-form hidden>
             <input type="text" name="name" maxlength="60" placeholder="New playlist name" required>
+            <input type="text" name="description" maxlength="1000" placeholder="Description (optional)">
             <button type="submit" class="chip-button">Create</button>
         </form>
         <ul class="playlist-index">

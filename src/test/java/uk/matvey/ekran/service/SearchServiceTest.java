@@ -1,18 +1,16 @@
 package uk.matvey.ekran.service;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Test;
 import uk.matvey.ekran.domain.SearchResult;
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
-
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import java.util.List;
 
 class SearchServiceTest {
 

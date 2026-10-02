@@ -16,9 +16,7 @@
                 <span data-list-title-text th:text="${title}">Marked movies</span>
                 <button type="button" class="list-name-edit" data-list-name-edit aria-label="Rename list"
                         th:hidden="${cards.isEmpty()}">
-                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                        <path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/>
-                    </svg>
+                    <th:block th:replace="~{pencil-icon :: icon}"></th:block>
                 </button>
             </h2>
             <input type="text" class="list-name-input" data-list-name-input maxlength="60" aria-label="List name" hidden>
@@ -32,28 +30,19 @@
                         hx-swap="innerHTML">Add to playlist</button>
                 <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
                 <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
+                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
             </div>
         </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c}, null)}"></li>
+                <li th:replace="~{movie-card :: card(${c}, null, null, null)}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">
             <p>No marked movies yet.</p>
             <p>Search for a movie and mark it to build a list.</p>
         </div>
-        <dialog id="share">
-            <div class="dialog-head">
-                <h2>Share</h2>
-                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
-            </div>
-            <div class="qr-wrap" data-qr-target></div>
-            <div class="qr-url-row">
-                <a class="qr-url" data-qr-url-text href="#" target="_blank" rel="noopener"></a>
-                <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
-            </div>
-        </dialog>
+        <th:block th:replace="~{share-dialog :: shareDialog(null)}"></th:block>
         <th:block th:replace="~{playlist-dialog :: playlistDialog}"></th:block>
     </section>
 </main>

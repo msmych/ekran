@@ -1,9 +1,6 @@
 package uk.matvey.ekran.tmdb;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -14,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;

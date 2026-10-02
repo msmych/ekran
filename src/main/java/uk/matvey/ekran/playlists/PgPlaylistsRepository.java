@@ -1,15 +1,12 @@
 package uk.matvey.ekran.playlists;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 import javax.sql.DataSource;
-
+import uk.matvey.ekran.db.Jdbc;
+import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
 
 public class PgPlaylistsRepository implements PlaylistsRepository {
@@ -22,230 +19,166 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
 
     @Override
     public List<Playlist> playlists(long userId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("""
-                 SELECT p.id, p.name, count(pm.movie_id) AS movie_count
-                 FROM playlists p
-                 LEFT JOIN playlist_movies pm ON pm.playlist_id = p.id
-                 WHERE p.user_id = ?
-                 GROUP BY p.id, p.name, p.updated_at
-                 ORDER BY p.updated_at DESC, p.id""")) {
-            ps.setLong(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                var playlists = new ArrayList<Playlist>();
-                while (rs.next()) {
-                    playlists.add(new Playlist(rs.getLong(1), rs.getString(2), rs.getInt(3)));
-                }
-                return playlists;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot load playlists: " + e.getMessage(), e);
-        }
+        return Jdbc.queryList(dataSource, "load playlists",
+            rs -> new Playlist(rs.getLong(1), rs.getString(2), rs.getInt(3)), """
+                SELECT p.id, p.name, count(pm.movie_id) AS movie_count
+                FROM playlists p
+                LEFT JOIN playlist_movies pm ON pm.playlist_id = p.id
+                WHERE p.user_id = ?
+                GROUP BY p.id, p.name, p.updated_at
+                ORDER BY p.updated_at DESC, p.id""", userId);
     }
 
     @Override
     public long playlistsCount(long userId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT count(*) FROM playlists WHERE user_id = ?")) {
-            ps.setLong(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot count playlists: " + e.getMessage(), e);
-        }
+        return Jdbc.queryOne(dataSource, "count playlists", rs -> rs.getLong(1),
+            "SELECT count(*) FROM playlists WHERE user_id = ?", userId).orElse(0L);
     }
 
+    // header and movies on one connection: one pool round-trip and one
+    // consistent snapshot of the playlist
     @Override
     public Optional<PlaylistDetail> playlist(long userId, long playlistId) {
-        String name;
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT name FROM playlists WHERE id = ? AND user_id = ?")) {
-            ps.setLong(1, playlistId);
-            ps.setLong(2, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                name = rs.getString(1);
+        return Jdbc.read(dataSource, "load playlist", conn -> {
+            var header = Jdbc.queryOne(conn, rs -> new String[]{rs.getString(1), rs.getString(2)},
+                "SELECT name, description FROM playlists WHERE id = ? AND user_id = ?", playlistId, userId);
+            if (header.isEmpty()) {
+                return Optional.<PlaylistDetail>empty();
             }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot load playlist: " + e.getMessage(), e);
-        }
-        return Optional.of(new PlaylistDetail(playlistId, name, movieIds(playlistId)));
+            var movies = movies(conn, playlistId);
+            return Optional.of(new PlaylistDetail(playlistId, header.get()[0], header.get()[1], movies));
+        });
     }
 
-    private List<Long> movieIds(long playlistId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "SELECT movie_id FROM playlist_movies WHERE playlist_id = ? ORDER BY position")) {
-            ps.setLong(1, playlistId);
-            try (ResultSet rs = ps.executeQuery()) {
-                var ids = new ArrayList<Long>();
-                while (rs.next()) {
-                    ids.add(rs.getLong(1));
-                }
-                return ids;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot load playlist movies: " + e.getMessage(), e);
-        }
+    private static List<MovieNote> movies(Connection conn, long playlistId) throws SQLException {
+        return Jdbc.queryList(conn, rs -> new MovieNote(rs.getLong(1), rs.getString(2)),
+            "SELECT movie_id, note FROM playlist_movies WHERE playlist_id = ? ORDER BY position", playlistId);
     }
 
     @Override
     public List<PlaylistMembership> playlistsWithMovie(long userId, long movieId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("""
-                 SELECT p.id, p.name, EXISTS (
-                     SELECT 1 FROM playlist_movies pm
-                     WHERE pm.playlist_id = p.id AND pm.movie_id = ?
-                 ) AS member
-                 FROM playlists p
-                 WHERE p.user_id = ?
-                 ORDER BY p.updated_at DESC, p.id""")) {
-            ps.setLong(1, movieId);
-            ps.setLong(2, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                var memberships = new ArrayList<PlaylistMembership>();
-                while (rs.next()) {
-                    memberships.add(new PlaylistMembership(rs.getLong(1), rs.getString(2), rs.getBoolean(3)));
-                }
-                return memberships;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot load playlist memberships: " + e.getMessage(), e);
-        }
+        return Jdbc.queryList(dataSource, "load playlist memberships",
+            rs -> new PlaylistMembership(rs.getLong(1), rs.getString(2), rs.getBoolean(3), rs.getString(4)), """
+                SELECT p.id, p.name, (pm.movie_id IS NOT NULL) AS member, pm.note
+                FROM playlists p
+                LEFT JOIN playlist_movies pm
+                    ON pm.playlist_id = p.id AND pm.movie_id = ?
+                WHERE p.user_id = ?
+                ORDER BY p.updated_at DESC, p.id""", movieId, userId);
     }
 
     @Override
-    public long createPlaylist(long userId, String name) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "INSERT INTO playlists (user_id, name) VALUES (?, ?) RETURNING id")) {
-            ps.setLong(1, userId);
-            ps.setString(2, name);
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
+    public long createPlaylist(long userId, String name, String description) {
+        return Jdbc.queryOne(dataSource, "create playlist", rs -> rs.getLong(1),
+            "INSERT INTO playlists (user_id, name, description) VALUES (?, ?, ?) RETURNING id",
+            userId, name, description)
+            .orElseThrow();
+    }
+
+    @Override
+    public long createPlaylist(long userId, String name, String description, List<MovieNote> movies) {
+        // one transaction: a failure between the create and the adds leaves
+        // no half-created playlist behind
+        return Jdbc.inTransaction(dataSource, "create playlist", conn -> {
+            var id = Jdbc.queryOne(conn, rs -> rs.getLong(1),
+                "INSERT INTO playlists (user_id, name, description) VALUES (?, ?, ?) RETURNING id",
+                userId, name, description)
+                .orElseThrow();
+            if (!movies.isEmpty()) {
+                insertMovies(conn, id, movies);
             }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot create playlist: " + e.getMessage(), e);
-        }
+            return id;
+        });
     }
 
     @Override
     public boolean renamePlaylist(long userId, long playlistId, String name) {
-        return update(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE playlists SET name = ?, updated_at = now() WHERE id = ? AND user_id = ?")) {
-                ps.setString(1, name);
-                ps.setLong(2, playlistId);
-                ps.setLong(3, userId);
-                return ps.executeUpdate() == 1;
-            }
-        });
+        return Jdbc.update(dataSource, "rename playlist",
+            "UPDATE playlists SET name = ?, updated_at = now() WHERE id = ? AND user_id = ?",
+            name, playlistId, userId) == 1;
+    }
+
+    @Override
+    public boolean updateDescription(long userId, long playlistId, String description) {
+        return Jdbc.update(dataSource, "update playlist description",
+            "UPDATE playlists SET description = ?, updated_at = now() WHERE id = ? AND user_id = ?",
+            description, playlistId, userId) == 1;
     }
 
     @Override
     public boolean deletePlaylist(long userId, long playlistId) {
         // playlist_movies rows go via ON DELETE CASCADE
-        return update(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM playlists WHERE id = ? AND user_id = ?")) {
-                ps.setLong(1, playlistId);
-                ps.setLong(2, userId);
-                return ps.executeUpdate() == 1;
-            }
-        });
+        return Jdbc.update(dataSource, "delete playlist",
+            "DELETE FROM playlists WHERE id = ? AND user_id = ?", playlistId, userId) == 1;
     }
 
     @Override
     public void addMovie(long userId, long playlistId, long movieId) {
-        addMovies(userId, playlistId, List.of(movieId));
+        addMovies(userId, playlistId, List.of(new MovieNote(movieId, null)));
     }
 
+    // the FOR UPDATE row lock serializes concurrent mutations of the same
+    // playlist: max-position-then-insert can no longer collide on
+    // UNIQUE (playlist_id, position), and a delete cannot interleave
     @Override
-    public void addMovies(long userId, long playlistId, List<Long> movieIds) {
-        if (movieIds.isEmpty()) {
+    public void addMovies(long userId, long playlistId, List<MovieNote> movies) {
+        if (movies.isEmpty()) {
             return;
         }
-        try (Connection conn = dataSource.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                if (!owned(conn, userId, playlistId)) {
-                    throw new NotFoundException("Playlist not found: " + playlistId);
-                }
-                var next = maxPosition(conn, playlistId);
-                try (PreparedStatement ps = conn.prepareStatement("""
-                    INSERT INTO playlist_movies (playlist_id, movie_id, position)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT (playlist_id, movie_id) DO NOTHING""")) {
-                    for (var movieId : movieIds) {
-                        ps.setLong(1, playlistId);
-                        ps.setLong(2, movieId);
-                        ps.setInt(3, ++next);
-                        ps.addBatch();
-                    }
-                    ps.executeBatch();
-                }
-                touch(conn, userId, playlistId);
-                conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot add movies to playlist: " + e.getMessage(), e);
+        Jdbc.inTransaction(dataSource, "add movies to playlist", conn -> {
+            requireOwned(conn, userId, playlistId);
+            insertMovies(conn, playlistId, movies);
+            touch(conn, playlistId);
+            return null;
+        });
+    }
+
+    private static void insertMovies(Connection conn, long playlistId, List<MovieNote> movies) throws SQLException {
+        var next = maxPosition(conn, playlistId);
+        for (var movie : movies) {
+            Jdbc.update(conn, """
+                INSERT INTO playlist_movies (playlist_id, movie_id, position, note)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (playlist_id, movie_id) DO NOTHING""",
+                playlistId, movie.movieId(), ++next, movie.note());
         }
     }
 
     @Override
     public void removeMovie(long userId, long playlistId, long movieId) {
-        try (Connection conn = dataSource.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                if (!owned(conn, userId, playlistId)) {
-                    throw new NotFoundException("Playlist not found: " + playlistId);
-                }
-                try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM playlist_movies WHERE playlist_id = ? AND movie_id = ?")) {
-                    ps.setLong(1, playlistId);
-                    ps.setLong(2, movieId);
-                    ps.executeUpdate();
-                }
-                touch(conn, userId, playlistId);
-                conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
+        Jdbc.inTransaction(dataSource, "remove movie from playlist", conn -> {
+            requireOwned(conn, userId, playlistId);
+            Jdbc.update(conn,
+                "DELETE FROM playlist_movies WHERE playlist_id = ? AND movie_id = ?", playlistId, movieId);
+            touch(conn, playlistId);
+            return null;
+        });
+    }
+
+    @Override
+    public boolean setMovieNote(long userId, long playlistId, long movieId, String note) {
+        return Jdbc.inTransaction(dataSource, "set playlist movie note", conn -> {
+            requireOwned(conn, userId, playlistId);
+            var updated = Jdbc.update(conn, """
+                UPDATE playlist_movies SET note = ?
+                WHERE playlist_id = ? AND movie_id = ?""", note, playlistId, movieId) == 1;
+            if (updated) {
+                touch(conn, playlistId);
             }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot remove movie from playlist: " + e.getMessage(), e);
-        }
+            return updated;
+        });
     }
 
     @Override
     public boolean moveMovie(long userId, long playlistId, long movieId, boolean up) {
-        try (Connection conn = dataSource.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                if (!owned(conn, userId, playlistId)) {
-                    throw new NotFoundException("Playlist not found: " + playlistId);
-                }
-                var moved = movePosition(conn, playlistId, movieId, up);
-                if (moved) {
-                    touch(conn, userId, playlistId);
-                }
-                conn.commit();
-                return moved;
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
+        return Jdbc.inTransaction(dataSource, "move movie in playlist", conn -> {
+            requireOwned(conn, userId, playlistId);
+            var moved = movePosition(conn, playlistId, movieId, up);
+            if (moved) {
+                touch(conn, playlistId);
             }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot move movie in playlist: " + e.getMessage(), e);
-        }
+            return moved;
+        });
     }
 
     // positions are unique per playlist but may have gaps (MAX+1 inserts,
@@ -253,17 +186,9 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
     // the edges, where wrap-around is a single reposition beyond the end
     private static boolean movePosition(Connection conn, long playlistId, long movieId, boolean up)
             throws SQLException {
-        List<MoviePosition> rows;
-        try (PreparedStatement ps = conn.prepareStatement(
-            "SELECT movie_id, position FROM playlist_movies WHERE playlist_id = ? ORDER BY position")) {
-            ps.setLong(1, playlistId);
-            try (ResultSet rs = ps.executeQuery()) {
-                rows = new ArrayList<>();
-                while (rs.next()) {
-                    rows.add(new MoviePosition(rs.getLong(1), rs.getInt(2)));
-                }
-            }
-        }
+        var rows = Jdbc.queryList(conn,
+            r -> new MoviePosition(r.getLong(1), r.getInt(2)),
+            "SELECT movie_id, position FROM playlist_movies WHERE playlist_id = ? ORDER BY position", playlistId);
         var index = -1;
         for (var i = 0; i < rows.size(); i++) {
             if (rows.get(i).movieId() == movieId) {
@@ -294,59 +219,31 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
     }
 
     private static void setPosition(Connection conn, long playlistId, long movieId, int position) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-            "UPDATE playlist_movies SET position = ? WHERE playlist_id = ? AND movie_id = ?")) {
-            ps.setInt(1, position);
-            ps.setLong(2, playlistId);
-            ps.setLong(3, movieId);
-            ps.executeUpdate();
-        }
+        Jdbc.update(conn,
+            "UPDATE playlist_movies SET position = ? WHERE playlist_id = ? AND movie_id = ?",
+            position, playlistId, movieId);
     }
 
     private record MoviePosition(long movieId, int position) {
     }
 
-    private static boolean owned(Connection conn, long userId, long playlistId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-            "SELECT 1 FROM playlists WHERE id = ? AND user_id = ?")) {
-            ps.setLong(1, playlistId);
-            ps.setLong(2, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+    private static void requireOwned(Connection conn, long userId, long playlistId) throws SQLException {
+        var owned = Jdbc.queryOne(conn, rs -> true,
+            "SELECT 1 FROM playlists WHERE id = ? AND user_id = ? FOR UPDATE", playlistId, userId)
+            .isPresent();
+        if (!owned) {
+            throw new NotFoundException("Playlist not found: " + playlistId);
         }
     }
 
     private static int maxPosition(Connection conn, long playlistId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-            "SELECT COALESCE(MAX(position), 0) FROM playlist_movies WHERE playlist_id = ?")) {
-            ps.setLong(1, playlistId);
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getInt(1);
-            }
-        }
+        return Jdbc.queryOne(conn, rs -> rs.getInt(1),
+            "SELECT COALESCE(MAX(position), 0) FROM playlist_movies WHERE playlist_id = ?", playlistId)
+            .orElse(0);
     }
 
-    private static void touch(Connection conn, long userId, long playlistId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-            "UPDATE playlists SET updated_at = now() WHERE id = ? AND user_id = ?")) {
-            ps.setLong(1, playlistId);
-            ps.setLong(2, userId);
-            ps.executeUpdate();
-        }
-    }
-
-    private boolean update(SqlOperation operation) {
-        try (Connection conn = dataSource.getConnection()) {
-            return operation.apply(conn);
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot update playlist: " + e.getMessage(), e);
-        }
-    }
-
-    @FunctionalInterface
-    private interface SqlOperation {
-        boolean apply(Connection conn) throws SQLException;
+    private static void touch(Connection conn, long playlistId) throws SQLException {
+        Jdbc.update(conn,
+            "UPDATE playlists SET updated_at = now() WHERE id = ?", playlistId);
     }
 }

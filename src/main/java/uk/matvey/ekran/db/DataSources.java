@@ -2,7 +2,6 @@ package uk.matvey.ekran.db;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
 import uk.matvey.ekran.config.AppConfig;
 
 public final class DataSources {

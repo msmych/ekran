@@ -1,8 +1,7 @@
 package uk.matvey.ekran.repository;
 
-import uk.matvey.ekran.domain.Movie;
-
 import java.util.Optional;
+import uk.matvey.ekran.domain.Movie;
 
 public interface MovieRepository {
 

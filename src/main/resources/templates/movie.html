@@ -32,6 +32,11 @@
                         <th:block th:replace="~{bookmark-icon :: icon(18)}"></th:block>
                     </button>
                 </div>
+                <!-- the mark's own note — independent from any playlist membership note;
+                     anonymous users get the same affordance client-side (local storage);
+                     the slot always renders so a fresh mark can drop the fragment in
+                     (:empty hides it while unmarked) -->
+                <div class="movie-note"><th:block th:if="${marked}" th:with="note=${markNote}, editUrl='/marked/' + ${vm.tmdbId()} + '/note/edit'"><div th:replace="~{note-area}"></div></th:block></div>
                 <div class="movie-playlists-row">
                     <div th:replace="~{playlist-chips :: chips(${memberships}, ${vm.tmdbId()}, false)}"></div>
                 </div>
@@ -73,9 +78,9 @@
         <p class="external-links">
             <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
         </p>
-        <dialog id="trailers" th:if="${!vm.videos().isEmpty()}">
+        <dialog id="trailers" aria-labelledby="trailers-dialog-title" th:if="${!vm.videos().isEmpty()}">
             <div class="dialog-head">
-                <h2>Trailers</h2>
+                <h2 id="trailers-dialog-title">Trailers</h2>
                 <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
             </div>
             <div id="player">

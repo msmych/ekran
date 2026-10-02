@@ -1,7 +1,6 @@
 package uk.matvey.ekran.service;
 
 import java.util.List;
-
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.repository.SearchRepository;

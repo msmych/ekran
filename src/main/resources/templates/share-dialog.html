@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- the share dialog: qrcode.js fills data-qr-target/data-qr-url-text/data-qr-copy.
+     data-share-url, when set, overrides what gets shared — the playlist page
+     shares its /list snapshot, not the playlist URL -->
+<dialog id="share" aria-labelledby="share-dialog-title"
+        th:fragment="shareDialog(shareUrl)"
+        th:attr="data-share-url=${shareUrl}">
+    <div class="dialog-head">
+        <h2 id="share-dialog-title">Share</h2>
+        <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+    </div>
+    <div class="qr-wrap" data-qr-target></div>
+    <div class="qr-url-row">
+        <a class="qr-url" data-qr-url-text href="#" target="_blank" rel="noopener"></a>
+        <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
+    </div>
+</dialog>
+</body>
+</html>

@@ -1,9 +1,8 @@
 package uk.matvey.ekran.service;
 
+import java.util.Optional;
 import uk.matvey.ekran.domain.Person;
 import uk.matvey.ekran.repository.PersonRepository;
-
-import java.util.Optional;
 
 public class PersonService {
 

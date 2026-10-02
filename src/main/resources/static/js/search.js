@@ -126,6 +126,7 @@
     // With a mouse, preventDefault keeps the focus on the input (clicks still
     // fire); same for the Cmd+K tip badge.
     var tapStart = null;
+    var tapThroughTimer = null;
     var suppressOverlayClickUntil = 0;
 
     document.addEventListener('pointerdown', function (event) {
@@ -136,7 +137,10 @@
             } else {
                 tapStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
                 overlay.classList.add('tap-through');
-                setTimeout(function () {
+                // a re-tap within the window restarts the grace period — an
+                // earlier timer must not yank the panel away mid-tap
+                clearTimeout(tapThroughTimer);
+                tapThroughTimer = setTimeout(function () {
                     overlay.classList.remove('tap-through');
                 }, 500);
             }
@@ -261,7 +265,14 @@
             return;
         }
         if (event.target.tagName === 'DIALOG') {
-            event.target.close();
+            // a click on the dialog's own scrollbar also targets the dialog
+            // element — only a click truly outside its box is a backdrop click
+            var rect = event.target.getBoundingClientRect();
+            var onBackdrop = event.clientX < rect.left || event.clientX > rect.right
+                || event.clientY < rect.top || event.clientY > rect.bottom;
+            if (onBackdrop) {
+                event.target.close();
+            }
         }
     });
 

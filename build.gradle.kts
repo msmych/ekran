@@ -1,6 +1,7 @@
 plugins {
     java
     application
+    id("com.diffplug.spotless") version "7.2.1"
 }
 
 group = "uk.matvey"
@@ -11,6 +12,7 @@ repositories {
 }
 
 dependencies {
+    implementation(libs.caffeine)
     implementation(libs.javalin)
     implementation(libs.javalin.rendering)
     implementation(libs.thymeleaf)
@@ -39,6 +41,16 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// hygiene only, not a code formatter — hand layout and line breaks stay as written
+spotless {
+    java {
+        importOrder()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 tasks.named<JavaExec>("run") {

@@ -143,7 +143,9 @@ body {
     color: var(--accent);
 }
 
-.card-mark.marked svg path {
+/* the filled bookmark, wherever the toggle lives */
+.card-mark.marked svg path,
+.mark-toggle.marked svg path {
     fill: currentColor;
     stroke: none;
 }
@@ -364,11 +366,7 @@ body {
     background: #fff;
 }
 
-.auth-form input[type="email"]:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: -1px;
-    border-color: transparent;
-}
+/* its :focus outline lives with the search input's, up top */
 
 .auth-submit {
     background: var(--accent);
@@ -608,11 +606,6 @@ body {
     color: var(--accent);
 }
 
-.mark-toggle.marked svg path {
-    fill: currentColor;
-    stroke: none;
-}
-
 .chip-button,
 .trailers-button {
     display: inline-block;
@@ -766,6 +759,8 @@ html:has(dialog[open]) body {
 
 .list-head h2:hover .list-name-edit,
 .list-head h2:focus-within .list-name-edit,
+.playlist-desc:hover .list-name-edit,
+.playlist-desc:focus-within .list-name-edit,
 .list-name-edit:focus-visible {
     visibility: visible;
 }
@@ -926,6 +921,59 @@ html:has(dialog[open]) body {
     display: none;
 }
 
+/* grid view (default): long notes are clamped to two lines — the rows view
+   is where they read comfortably */
+.movie-cards:not([data-view="rows"]) .card-note-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* rows view: the same card markup laid out horizontally — poster thumb
+   pinned to the left (absolute, so it never pushes the note down; the note
+   starts right under the title whatever the poster height), title row and
+   note flowing in the wide right column; toggled by the Rows/Grid chip,
+   remembered per visitor */
+.movie-cards[data-view="rows"] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.movie-cards[data-view="rows"] li {
+    display: block;
+    padding-left: 84px;
+    min-height: 108px;
+}
+
+/* the poster link is the li's first direct card-link (the info link lives
+   inside .card-details) — pin it into the padding-left gutter */
+.movie-cards[data-view="rows"] li > .card-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 72px;
+}
+
+.movie-cards[data-view="rows"] .card-details {
+    margin-top: 0;
+    align-items: center;
+}
+
+.movie-cards[data-view="rows"] .card-details .card-title {
+    font-size: 15px;
+}
+
+.movie-cards[data-view="rows"] li > .card-note {
+    margin: 2px 0 0;
+}
+
+/* readable line length for long notes on wide screens */
+.movie-cards[data-view="rows"] .card-note-text {
+    max-width: 480px;
+}
+
 .empty-list {
     color: var(--muted);
     margin-top: 24px;
@@ -1075,7 +1123,7 @@ kbd {
         width: min(260px, 60vw);
     }
 
-    #search-kbd {
+    .search-kbd {
         display: none;
     }
 
@@ -1121,6 +1169,10 @@ kbd {
     .card-mark,
     .card-move,
     .card-poster,
+    .card-note-toggle,
+    .card-note-form,
+    .card-note-cancel,
+    .empty-list,
     .tmdb-footer {
         display: none !important;
     }
@@ -1134,9 +1186,23 @@ kbd {
     }
 
     .marked-list .movie-cards li {
+        display: block;
         padding: 6px 0;
         border-bottom: 1px solid #ddd;
         break-inside: avoid;
+    }
+
+    /* whatever view was active on screen, print gets the same clean rows:
+       no poster gutter, no row min-height, no note clamp */
+    .marked-list .movie-cards[data-view="rows"] li {
+        min-height: 0;
+        padding-left: 0;
+    }
+
+    .marked-list .card-note-text {
+        display: block;
+        -webkit-line-clamp: unset;
+        overflow: visible;
     }
 
     .marked-list .card-info {
@@ -1274,8 +1340,29 @@ kbd {
     color: var(--muted);
 }
 
+.playlist-select .pick-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 0;
+    font-size: 13px;
+    color: var(--accent);
+}
+
+.playlist-select .pick-confirmation p {
+    margin: 0;
+}
+
+.playlist-select .pick-confirmation .chip-button {
+    flex: none;
+}
+
+/* the create form in the dialog: column layout so the optional description
+   gets its own line */
 .playlist-select .pick-new {
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: 0 16px 16px;
 }
@@ -1344,4 +1431,153 @@ kbd {
 .chip-button.danger:hover {
     border-color: var(--accent);
     color: var(--accent);
+}
+
+/* personal notes: mark notes (marked page, movie page), membership notes
+   (playlist page, picker dialog) — plain text plus a light inline editor */
+.card-note {
+    margin-top: 4px;
+}
+
+.card-note-text {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.card-note-toggle {
+    border: none;
+    background: none;
+    padding: 0;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.card-note-toggle:hover {
+    color: var(--accent);
+}
+
+.card-note-form {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-note-form textarea {
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    resize: vertical;
+    outline: none;
+}
+
+.card-note-form textarea:focus {
+    border-color: var(--accent);
+}
+
+.card-note-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-note-cancel {
+    border: none;
+    background: none;
+    padding: 0 4px;
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.card-note-cancel:hover {
+    color: var(--accent);
+}
+
+/* movie page: the mark's note block under the actions row */
+.movie-note {
+    margin-top: 8px;
+    max-width: 480px;
+}
+
+/* the slot always renders so a fresh mark can drop the note fragment in;
+   empty (unmarked) it takes no space */
+.movie-note:empty {
+    display: none;
+}
+
+.movie-note .card-note-text {
+    font-size: 13px;
+}
+
+.movie-note .card-note-form textarea {
+    font-size: 13px;
+}
+
+/* picker dialog: each member row carries its membership note underneath */
+.playlist-picker li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.playlist-picker .pick-note .card-note {
+    margin: 0;
+}
+
+.playlist-picker .pick-note .card-note-toggle {
+    margin-top: 0;
+}
+
+/* playlist page: the optional description under the title, edited in place
+   like the rename — the pencil appears on hover, always on touch */
+.playlist-desc {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin: -4px 0 12px;
+}
+
+.playlist-description {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
+.playlist-desc .list-name-edit {
+    visibility: hidden;
+}
+
+/* hover/focus visibility is shared with the rename pencil, up in .list-head */
+
+.playlist-desc-form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.playlist-desc-form textarea {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 100%;
+    max-width: 520px;
+    resize: vertical;
+    outline: none;
+}
+
+.playlist-desc-form textarea:focus {
+    border-color: var(--accent);
 }

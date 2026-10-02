@@ -83,13 +83,18 @@ Templates bind to view models only, never domain records directly, so display fo
 **Landed first (auth + user data):** `users`, `login_tokens` (SHA-256-hashed, TTL, single-use), `sessions` (the session id column stores a hash of the cookie value — see `configuration-and-ops.md`), plus the marked/playlist tables:
 
 ```sql
-marked_movies   -- user_id, movie_id (tmdb), created_at; PK (user_id, movie_id)
-playlists       -- id, user_id, name (≤60, not unique), created_at, updated_at; indexed by user_id
-playlist_movies -- playlist_id, movie_id (tmdb), position (MAX+1 on insert), created_at;
+marked_movies   -- user_id, movie_id (tmdb), note (≤500, nullable), created_at;
+                  PK (user_id, movie_id)
+playlists       -- id, user_id, name (≤60, not unique), description (≤1000, nullable),
+                  created_at, updated_at; indexed by user_id
+playlist_movies -- playlist_id, movie_id (tmdb), note (≤500, nullable),
+                  position (MAX+1 on insert), created_at;
                   PK (playlist_id, movie_id), UNIQUE (playlist_id, position)
 ```
 
 Movie references are TMDB IDs stored directly (`BIGINT`) — no local movies table yet, so marks/playlists are verified only by format (`[1-9][0-9]{0,9}`), resolved through TMDB at render time. All queries are scoped by `user_id` from the session; a foreign playlist id is a 404, not a leak.
+
+Notes (mark notes, playlist descriptions, per-membership notes) are trimmed on write, blank → NULL, and are private per-user data — they never appear in shared `/list?…` URLs (the share URL carries only movie ids + the list name). Re-adding an existing membership never overwrites its note or position (`ON CONFLICT (playlist_id, movie_id) DO NOTHING`). Composing a playlist from marks copies each card's mark note into the new membership; the marks themselves (and their notes) stay put.
 
 The repository boundary above is designed so the knowledge base lands later without touching `service/` or `web/`. Intended schema:
 

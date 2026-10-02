@@ -1,21 +1,19 @@
 package uk.matvey.ekran.playlists;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.util.List;
+import java.util.Optional;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
-
 import uk.matvey.ekran.auth.PgAuthRepository;
 import uk.matvey.ekran.db.DbMigrations;
-
-import javax.sql.DataSource;
-
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import uk.matvey.ekran.domain.MovieNote;
 
 /** PgPlaylistsRepository against real PostgreSQL (Testcontainers). Requires Docker. */
 class PgPlaylistsRepositoryTest {
@@ -50,7 +48,7 @@ class PgPlaylistsRepositoryTest {
     void createListRenameDelete() {
         var userId = authRepository.insertUser("crud@bar.com");
 
-        var id = repository.createPlaylist(userId, "Watch soon");
+        var id = repository.createPlaylist(userId, "Watch soon", null);
         assertThat(repository.playlistsCount(userId)).isEqualTo(1);
         assertThat(repository.playlists(userId))
             .singleElement()
@@ -72,9 +70,9 @@ class PgPlaylistsRepositoryTest {
     @Test
     void membershipFollowsStableAddOrder() {
         var userId = authRepository.insertUser("order@bar.com");
-        var id = repository.createPlaylist(userId, "Ordered");
+        var id = repository.createPlaylist(userId, "Ordered", null);
 
-        repository.addMovies(userId, id, List.of(238L, 680L, 155L));
+        repository.addMovies(userId, id, notes(238L, 680L, 155L));
         repository.addMovie(userId, id, 13L);
         repository.removeMovie(userId, id, 680L);
         repository.addMovie(userId, id, 90L);
@@ -85,7 +83,7 @@ class PgPlaylistsRepositoryTest {
     @Test
     void membershipIsIdempotentAndCounted() {
         var userId = authRepository.insertUser("member@bar.com");
-        var id = repository.createPlaylist(userId, "Counted");
+        var id = repository.createPlaylist(userId, "Counted", null);
 
         repository.addMovie(userId, id, 238L);
         repository.addMovie(userId, id, 238L);
@@ -102,13 +100,13 @@ class PgPlaylistsRepositoryTest {
     @Test
     void deletingPlaylistDeletesMemberships() {
         var userId = authRepository.insertUser("cascade@bar.com");
-        var id = repository.createPlaylist(userId, "Doomed");
-        repository.addMovies(userId, id, List.of(238L, 680L));
+        var id = repository.createPlaylist(userId, "Doomed", null);
+        repository.addMovies(userId, id, notes(238L, 680L));
 
         repository.deletePlaylist(userId, id);
 
         assertThat(repository.playlist(userId, id)).isEmpty();
-        var fresh = repository.createPlaylist(userId, "Fresh");
+        var fresh = repository.createPlaylist(userId, "Fresh", null);
         assertThat(repository.playlist(userId, fresh)).map(PlaylistDetail::movieIds).contains(List.of());
     }
 
@@ -116,7 +114,7 @@ class PgPlaylistsRepositoryTest {
     void otherUsersPlaylistIsInvisible() {
         var alice = authRepository.insertUser("owner@bar.com");
         var bob = authRepository.insertUser("intruder@bar.com");
-        var id = repository.createPlaylist(alice, "Private");
+        var id = repository.createPlaylist(alice, "Private", null);
         repository.addMovie(alice, id, 238L);
 
         assertThat(repository.playlist(bob, id)).isEmpty();
@@ -140,8 +138,8 @@ class PgPlaylistsRepositoryTest {
 @Test
 void moveMovieSwapsAndWraps() {
     var userId = authRepository.insertUser("reorder@bar.com");
-    var id = repository.createPlaylist(userId, "Ordered");
-    repository.addMovies(userId, id, List.of(238L, 680L, 155L));
+    var id = repository.createPlaylist(userId, "Ordered", null);
+    repository.addMovies(userId, id, notes(238L, 680L, 155L));
 
     // adjacent swap in the middle
     assertThat(repository.moveMovie(userId, id, 680L, true)).isTrue();
@@ -167,7 +165,7 @@ void moveMovieSwapsAndWraps() {
     // unknown movie and single-member playlists are no-ops
     assertThat(repository.moveMovie(userId, id, 999L, true)).isFalse();
     assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(238L, 680L));
-    var single = repository.createPlaylist(userId, "Single");
+    var single = repository.createPlaylist(userId, "Single", null);
     repository.addMovie(userId, single, 238L);
     assertThat(repository.moveMovie(userId, single, 238L, true)).isFalse();
 }
@@ -176,8 +174,8 @@ void moveMovieSwapsAndWraps() {
 void moveMovieIsOwnershipScoped() {
     var alice = authRepository.insertUser("mover@bar.com");
     var bob = authRepository.insertUser("meddler@bar.com");
-    var id = repository.createPlaylist(alice, "Private order");
-    repository.addMovies(alice, id, List.of(238L, 680L));
+    var id = repository.createPlaylist(alice, "Private order", null);
+    repository.addMovies(alice, id, notes(238L, 680L));
 
     var caught = false;
     try {
@@ -192,8 +190,8 @@ void moveMovieIsOwnershipScoped() {
 @Test
 void indexIsOrderedByRecentlyUpdated() {
         var userId = authRepository.insertUser("recent@bar.com");
-        var first = repository.createPlaylist(userId, "Old");
-        var second = repository.createPlaylist(userId, "New");
+        var first = repository.createPlaylist(userId, "Old", null);
+        var second = repository.createPlaylist(userId, "New", null);
         repository.renamePlaylist(userId, first, "Old touched");
 
         assertThat(repository.playlists(userId))
@@ -201,5 +199,72 @@ void indexIsOrderedByRecentlyUpdated() {
             .containsExactly("Old touched", "New");
         assertThat(Optional.of(repository.playlists(userId).getFirst().id())).contains(first);
         assertThat(repository.playlists(userId).get(1).id()).isEqualTo(second);
+    }
+
+@Test
+void descriptionsAreOptionalAndOwnershipScoped() {
+        var alice = authRepository.insertUser("desc-a@bar.com");
+        var bob = authRepository.insertUser("desc-b@bar.com");
+
+        var id = repository.createPlaylist(alice, "90s", "Films I keep coming back to.");
+        assertThat(repository.playlist(alice, id)).map(PlaylistDetail::description).contains("Films I keep coming back to.");
+
+        assertThat(repository.updateDescription(alice, id, "Nineties essentials")).isTrue();
+        assertThat(repository.playlist(alice, id)).map(PlaylistDetail::description).contains("Nineties essentials");
+
+        // blank removes; description edits count as updates
+        assertThat(repository.updateDescription(alice, id, null)).isTrue();
+        assertThat(repository.playlist(alice, id)).map(PlaylistDetail::description).isEmpty();
+
+        // a foreign playlist behaves like a missing one
+        assertThat(repository.updateDescription(bob, id, "hijack")).isFalse();
+    }
+
+@Test
+void membershipNotesArePerPlaylistAndIdempotentAddsKeepThem() {
+        var userId = authRepository.insertUser("mnotes@bar.com");
+        var id = repository.createPlaylist(userId, "90s", null);
+        var other = repository.createPlaylist(userId, "Watchlist", null);
+
+        // no note on a movie that is not a member
+        assertThat(repository.setMovieNote(userId, id, 238, "x")).isFalse();
+
+        // new memberships carry notes; re-adding keeps the existing note
+        repository.addMovies(userId, id, List.of(new MovieNote(238, "glasses are cooler"), new MovieNote(680, null)));
+        repository.addMovies(userId, id, List.of(new MovieNote(238, "should not overwrite")));
+        assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movies)
+            .contains(List.of(new MovieNote(238, "glasses are cooler"), new MovieNote(680, null)));
+
+        // the same movie, a different note in another playlist
+        repository.addMovies(userId, other, List.of(new MovieNote(238, "watch this month")));
+        assertThat(repository.playlist(userId, other)).map(PlaylistDetail::movies)
+            .contains(List.of(new MovieNote(238, "watch this month")));
+
+        // setMovieNote edits and clears, and membership queries carry notes
+        assertThat(repository.setMovieNote(userId, id, 680, "diner scene")).isTrue();
+        assertThat(repository.setMovieNote(userId, id, 238, null)).isTrue();
+        assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movies)
+            .contains(List.of(new MovieNote(238, null), new MovieNote(680, "diner scene")));
+        assertThat(repository.playlistsWithMovie(userId, 680))
+            .anySatisfy(m -> {
+                assertThat(m.id()).isEqualTo(id);
+                assertThat(m.member()).isTrue();
+                assertThat(m.note()).isEqualTo("diner scene");
+            });
+        assertThat(repository.playlistsWithMovie(userId, 238))
+            .anySatisfy(m -> {
+                assertThat(m.id()).isEqualTo(other);
+                assertThat(m.note()).isEqualTo("watch this month");
+            });
+
+        // removing the membership drops its note
+        repository.removeMovie(userId, id, 680);
+        repository.addMovies(userId, id, List.of(new MovieNote(680, null)));
+        assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movies)
+            .contains(List.of(new MovieNote(238, null), new MovieNote(680, null)));
+    }
+
+    private static List<MovieNote> notes(Long... movieIds) {
+        return java.util.Arrays.stream(movieIds).map(id -> new MovieNote(id, null)).toList();
     }
 }

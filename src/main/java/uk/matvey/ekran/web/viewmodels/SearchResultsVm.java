@@ -1,8 +1,7 @@
 package uk.matvey.ekran.web.viewmodels;
 
-import uk.matvey.ekran.domain.SearchResultPage;
-
 import java.util.List;
+import uk.matvey.ekran.domain.SearchResultPage;
 
 public record SearchResultsVm(
     String query,

@@ -1,10 +1,8 @@
 package uk.matvey.ekran.web;
 
-import java.util.Map;
-
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-
+import java.util.Map;
 import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.service.SearchService;
 import uk.matvey.ekran.web.viewmodels.SearchResultsVm;

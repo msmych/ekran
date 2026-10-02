@@ -100,8 +100,9 @@ shows the email and a sign-out button (logout deletes the server-side session).
 | `/list/card?movie={id}` | HTMX-only single-card fragment (used when marking from the search overlay while viewing `/list`) |
 | `/signin` · `/signin/sent` · `/auth/link?token=…` | Passwordless email sign-in (magic link) |
 | `/marked` | Signed-in: your marked movies (server-persisted). The header `Marked · N` points here instead of `/list` |
-| `/marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` | Mark sync endpoints (authed; bulk POST is the idempotent local→server merge) |
-| `/playlists` · `/playlists/{id}` | Signed-in playlist index and detail (rename/delete/Share/Print) |
+| `/marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` · `POST /marked/migrate` | Mark sync endpoints (authed; bulk POST is the idempotent local→server merge, migrate is the JSON sign-in migration with notes) |
+| `/marked/{movieId}/note[/edit]` · `/playlists/{id}/movies/{movieId}/note[/edit]` | Mark/membership note display + editor fragments (htmx, ≤500 chars) |
+| `/playlists` · `/playlists/{id}` | Signed-in playlist index and detail (description, rename/delete/Share/Print) |
 | `/playlists/select?movie={id}…` · `/playlists/{id}/movies…` | HTMX fragment for the "Add to playlist" dialog + membership mutations |
 | `/account` | Minimal account page (email + sign out) |
 | `/about` | About page |
@@ -178,6 +179,8 @@ planned PostgreSQL-backed local store (step 2) a drop-in replacement — see
 
 One TMDB call per page view: search = `/search/movie`, movie page = `/movie/{id}` with
 `append_to_response=credits`, person page = `/person/{id}` with `append_to_response=movie_credits`.
+List surfaces (`/list`, `/marked`, playlists) render up to 100 cards and go through a
+Caffeine cache in `MovieService` (24 h TTL) — see `docs/tmdb-integration.md`.
 
 Search-as-you-type is HTMX with a 100 ms debounce and `hx-sync="this: replace"` (aborts any
 in-flight request and replaces it, so stale responses can't overwrite newer results and the
@@ -196,10 +199,14 @@ Escape, click-away, keyboard nav) and a ~660-line `marked.js` (marking + share/Q
 Movies can be **marked** via the bookmark toggle on the movie page, on any movie card, or
 straight from search results (`m` works too). Anonymous marks live in `localStorage` only;
 signed-in marks live in PostgreSQL (`marked_movies`, migrated from localStorage on first
-authenticated load — additive and idempotent). The header shows `Marked · N` (hidden until
-your first mark): for anonymous users it opens `/list?movie=…` (the URL *is* the list —
-share it as-is or via the QR dialog, print it with original titles and directors, clear it
-after a confirm); for signed-in users it opens `/marked` (Share/Print/Clear there).
+authenticated load — additive and idempotent, mark notes included). A mark can carry an
+optional personal note (≤500 chars): on cards it sits muted under the info row with an
+inline ✎ editor; on the movie page, under the actions row. Anonymous notes stay in
+`localStorage`; shared URLs never contain notes. The header shows `Marked · N` (hidden
+until your first mark): for anonymous users it opens `/list?movie=…` (the URL *is* the
+list — share it as-is or via the QR dialog, print it with original titles and directors,
+clear it after a confirm); for signed-in users it opens `/marked` (Share/Print/Clear
+there).
 
 A shared URL opened elsewhere reads "Shared list" with an "Add all to marked" button — it
 never imports silently (for signed-in users that button persists the bulk via the server).
@@ -208,8 +215,11 @@ Signed-in users can also group movies into **playlists** (`playlists` + `playlis
 in PostgreSQL, ordered by insert position): the `Add to playlist` dialog on movie pages
 and lists lets them create playlists, toggle membership, or bulk-add the whole shared
 list. Playlists are ownership-scoped (another user's playlist behaves as 404); membership
-is independent of marks — unmarking never removes from a playlist. A playlist's Share
-link is just `/list?movie=…&name=…`, so it renders for anyone, no account needed.
+is independent of marks — composing a playlist from your marks **copies** (the marks and
+their notes stay; each new membership inherits the mark's note). A playlist can carry an
+optional description (≤1000 chars), and each membership an optional per-playlist note —
+both edited in place. A playlist's Share link is just `/list?movie=…&name=…`, so it
+renders for anyone, no account needed.
 
 ## Project layout
 

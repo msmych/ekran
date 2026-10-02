@@ -6,9 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-
 import javax.sql.DataSource;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +28,11 @@ public final class DbMigrations {
         for (int version = 1; ; version++) {
             var sql = loadMigration(version);
             if (sql == null) {
+                // a gap in the sequence would silently skip everything after it —
+                // a renumbered or deleted migration must fail loudly instead
+                if (migrationExists(version + 1)) {
+                    throw new IllegalStateException("Missing migration V" + version + " but V" + (version + 1) + " exists: the sequence has a gap");
+                }
                 break;
             }
             if (isApplied(dataSource, version)) {
@@ -95,5 +98,9 @@ public final class DbMigrations {
         } catch (IOException e) {
             throw new IllegalStateException("Cannot read migration V" + version, e);
         }
+    }
+
+    private static boolean migrationExists(int version) {
+        return DbMigrations.class.getResource("/db/migration/V" + version + ".sql") != null;
     }
 }

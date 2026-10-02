@@ -6,6 +6,8 @@
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
     <div th:replace="~{header :: header(true)}"></div>
     <div id="results" aria-live="polite">
+        <!-- th:insert, not th:replace: th:replace would evaluate the fragment before the
+         th:if guard runs (higher attribute precedence) and 500 when resultsVm is absent -->
         <th:block th:if="${resultsVm} != null" th:insert="~{results :: results}"></th:block>
     </div>
 </main>

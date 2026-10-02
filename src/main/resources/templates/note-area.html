@@ -1,0 +1,12 @@
+<!-- the personal note display: the note (when present) plus the edit affordance;
+     GET editUrl (hx) swaps this whole area for the note-editor form.
+     Rendered directly by the note routes and included whole by the pages -->
+<div class="card-note" xmlns:th="http://www.thymeleaf.org">
+    <p class="card-note-text" th:if="${note != null}" th:text="${note}">note</p>
+    <button type="button" class="card-note-toggle"
+            th:attr="hx-get=${editUrl}"
+            th:aria-label="${note != null} ? 'Edit note' : 'Add note'"
+            hx-target="closest .card-note"
+            hx-swap="outerHTML"
+            th:text="${note != null} ? '✎' : '+ note'">+ note</button>
+</div>

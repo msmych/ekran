@@ -7,7 +7,6 @@ import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-
 import uk.matvey.ekran.config.AppConfig;
 import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.Filmography;

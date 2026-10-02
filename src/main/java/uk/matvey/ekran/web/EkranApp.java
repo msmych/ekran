@@ -1,23 +1,20 @@
 package uk.matvey.ekran.web;
 
-import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.sql.DataSource;
-
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.rendering.FileRenderer;
 import io.javalin.rendering.template.JavalinThymeleaf;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
-
 import uk.matvey.ekran.auth.AuthService;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;
@@ -73,7 +70,7 @@ public final class EkranApp {
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
         app.before(ctx -> resolveCurrentUser(ctx, authService, marksService, playlistsService));
         new SearchRoutes(searchService).register(app);
-        new MovieRoutes(movieService, playlistsService).register(app);
+        new MovieRoutes(movieService, playlistsService, marksService).register(app);
         new PersonRoutes(personService).register(app);
         new ListRoutes(movieService).register(app);
         new AuthRoutes(authService, secureCookies).register(app);
@@ -134,6 +131,7 @@ public final class EkranApp {
     }
 
     private static void health(Context ctx, DataSource dataSource) {
+        // tests assemble the app without a DB; production always has one
         if (dataSource == null) {
             ctx.json(Map.of("status", "UP"));
             return;
@@ -148,6 +146,9 @@ public final class EkranApp {
     }
 
     private static void registerErrorHandlers(Javalin app) {
+        // typed Javalin responses (UnauthorizedResponse, BadRequestResponse) are
+        // mapped to their status codes by the framework's own default handler
+        // for HttpResponseException — this catch-all must not touch them
         app.exception(NotFoundException.class, (e, ctx) -> ctx.status(404));
         app.exception(TmdbAuthException.class, (e, ctx) -> {
             log.error("TMDB rejected credentials — check TMDB_API_TOKEN");

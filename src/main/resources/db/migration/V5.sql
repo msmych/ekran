@@ -7,8 +7,9 @@ CREATE TABLE playlists (
 );
 CREATE INDEX playlists_user_id_idx ON playlists (user_id);
 
--- position keeps the stable add order for shared snapshot URLs;
--- reordering, if ever added, is a pure UPDATE on this column
+-- position keeps the stable add order for shared snapshot URLs and drives
+-- reordering: moves swap positions under the playlist row lock (see
+-- PgPlaylistsRepository), gaps are allowed
 CREATE TABLE playlist_movies (
     playlist_id BIGINT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
     movie_id BIGINT NOT NULL,

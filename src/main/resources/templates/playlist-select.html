@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org">
 <body>
-<div class="playlist-select" th:fragment="select(memberships, movieId, movieIds, clearMarked)">
-    <input type="hidden" name="clearMarked" value="true" th:if="${clearMarked}" data-clear-marked>
+<div class="playlist-select" th:fragment="select(memberships, movieId, movieIds)">
     <div class="dialog-head">
-        <h2 th:text="${movieId != null} ? 'Playlists' : 'Add ' + ${movieIds.size()} + ' movies to…'">Playlists</h2>
+        <h2 id="playlist-select-title" th:text="${movieId != null} ? 'Playlists' : 'Add ' + ${movieIds.size()} + ' movies to…'">Playlists</h2>
         <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+    </div>
+    <!-- shown after a bulk add/create: the dialog stays on the page it was
+         opened from, the confirmation plus a jump into the new/updated list -->
+    <div class="pick-confirmation" th:if="${confirmation != null}">
+        <p th:text="${confirmation}">Added</p>
+        <a class="chip-button" th:if="${playlistUrl != null}" th:href="${playlistUrl}" hx-boost="false">Open playlist</a>
     </div>
     <ul class="playlist-picker">
         <li th:each="m : ${memberships}">
@@ -27,22 +32,32 @@
             <th:block th:if="${movieId == null}">
                 <button type="button" class="pick"
                         th:attr="hx-post='/playlists/' + ${m.id} + '/movies'"
-                        hx-include="closest .playlist-select"
+                        hx-include="closest .playlist-select find .dialog-movies"
                         hx-target="#playlist-select-body"
                         hx-swap="innerHTML">
                     <span class="pick-name" th:text="${m.name}">Favorites</span>
                 </button>
             </th:block>
+            <!-- the membership's own note, editable in place -->
+            <div th:if="${movieId != null and m.member()}" class="pick-note"
+                 th:with="note=${m.note()}, editUrl='/playlists/' + ${m.id} + '/movies/' + ${movieId} + '/note/edit'">
+                <div th:replace="~{note-area}"></div>
+            </div>
         </li>
         <li th:if="${memberships.isEmpty()}" class="pick-empty">
             No playlists yet — create the first one below.
         </li>
     </ul>
-    <form class="pick-new" hx-post="/playlists" hx-boost="false"
-          hx-include="[data-clear-marked]"
-          hx-target="#playlist-select-body" hx-swap="innerHTML">
+    <!-- hx-include on the bulk pick buttons pulls exactly these hidden inputs —
+         the name/description fields of the create form below never ride along -->
+    <div class="dialog-movies" hidden>
         <input type="hidden" name="movie" th:each="id : ${movieIds}" th:value="${id}">
+    </div>
+    <form class="pick-new" hx-post="/playlists"
+          hx-include="closest .dialog-movies"
+          hx-target="#playlist-select-body" hx-swap="innerHTML">
         <input type="text" name="name" maxlength="60" placeholder="New playlist name" required>
+        <input type="text" name="description" maxlength="1000" placeholder="Description (optional)">
         <button type="submit" class="chip-button">Create</button>
     </form>
     <th:block th:if="${movieId != null}">

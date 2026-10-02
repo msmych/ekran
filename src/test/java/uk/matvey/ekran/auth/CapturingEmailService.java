@@ -3,7 +3,6 @@ package uk.matvey.ekran.auth;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-
 import uk.matvey.ekran.email.EmailService;
 
 /** Captures outgoing emails instead of sending them. */

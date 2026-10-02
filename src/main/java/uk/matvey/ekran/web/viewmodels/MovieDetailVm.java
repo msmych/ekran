@@ -3,7 +3,6 @@ package uk.matvey.ekran.web.viewmodels;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-
 import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.MovieVideo;
 

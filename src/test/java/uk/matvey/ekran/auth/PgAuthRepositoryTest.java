@@ -1,22 +1,19 @@
 package uk.matvey.ekran.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-
-import uk.matvey.ekran.db.DbMigrations;
-
-import javax.sql.DataSource;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import uk.matvey.ekran.db.DbMigrations;
 
 /**
  * Full lifecycle against real PostgreSQL (Testcontainers) — migrations, token
@@ -55,7 +52,7 @@ class PgAuthRepositoryTest {
     void migrationsAreIdempotent() {
         DbMigrations.migrate(dataSource);
 
-        assertThat(migrationCount()).isEqualTo(5);
+        assertThat(migrationCount()).isEqualTo(6);
     }
 
     @Test

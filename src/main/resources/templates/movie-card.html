@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <body>
-<li th:fragment="card(c, playlistId)" th:attr="data-movie-id=${c.tmdbId()}">
+<li th:fragment="card(c, playlistId, note, noteEditUrl)" th:attr="data-movie-id=${c.tmdbId()}">
     <!-- playlist reorder controls: only rendered on the playlist page (playlistId set),
          hidden until Reorder mode is toggled on; both arrows are live — the edges wrap -->
     <div class="card-move" th:if="${playlistId != null}">
@@ -40,6 +40,11 @@
             <th:block th:replace="~{bookmark-icon :: icon(14)}"></th:block>
         </button>
     </div>
+    <!-- personal note: mark note (marked page) or membership note (playlist page);
+         the page maps its context into note/editUrl for the shared note-area -->
+    <th:block th:if="${noteEditUrl != null}" th:with="editUrl=${noteEditUrl}">
+        <div th:replace="~{note-area}"></div>
+    </th:block>
 </li>
 </body>
 </html>

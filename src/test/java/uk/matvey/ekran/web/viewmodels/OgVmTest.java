@@ -1,13 +1,12 @@
 package uk.matvey.ekran.web.viewmodels;
 
-import org.junit.jupiter.api.Test;
-
-import uk.matvey.ekran.domain.Movie;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import uk.matvey.ekran.domain.Movie;
 
 class OgVmTest {
 

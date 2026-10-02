@@ -14,32 +14,23 @@
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
                 <button type="button" class="chip-button" th:if="${!cards.isEmpty()}"
                         data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds},from='marked')}"
+                        th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
                         hx-target="#playlist-select-body"
                         hx-swap="innerHTML">Add all to playlist</button>
                 <button type="button" class="chip-button" data-clear-marks th:hidden="${cards.isEmpty()}">Clear all</button>
+                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
             </div>
         </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c}, null)}"></li>
+                <li th:replace="~{movie-card :: card(${c}, null, ${markNotes[c.tmdbId()]}, '/marked/' + ${c.tmdbId()} + '/note/edit')}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">
             <p>No marked movies yet.</p>
             <p>Search for a movie and mark it to build a list.</p>
         </div>
-        <dialog id="share">
-            <div class="dialog-head">
-                <h2>Share</h2>
-                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
-            </div>
-            <div class="qr-wrap" data-qr-target></div>
-            <div class="qr-url-row">
-                <a class="qr-url" data-qr-url-text href="#" target="_blank" rel="noopener"></a>
-                <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
-            </div>
-        </dialog>
+        <th:block th:replace="~{share-dialog :: shareDialog(null)}"></th:block>
         <th:block th:replace="~{playlist-dialog :: playlistDialog}"></th:block>
     </section>
 </main>

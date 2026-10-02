@@ -10,9 +10,7 @@
         <div class="list-head">
             <h2><span th:text="${name}">Playlist</span>
                 <button type="button" class="list-name-edit" data-rename-toggle aria-label="Rename playlist">
-                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                        <path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/>
-                    </svg>
+                    <th:block th:replace="~{pencil-icon :: icon}"></th:block>
                 </button>
             </h2>
             <!-- replaces the title in place while editing: the heading hides,
@@ -25,6 +23,7 @@
             </form>
             <div class="list-actions playlist-actions">
                 <button type="button" class="chip-button" data-reorder-toggle th:hidden="${cards.isEmpty()}">Reorder</button>
+                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
                 <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
                 <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
@@ -33,26 +32,29 @@
                 </form>
             </div>
         </div>
+        <!-- optional description, edited in place like the rename: the pencil
+             reveals the form, the text and pencil hide while it is open -->
+        <div class="playlist-desc">
+            <p class="playlist-description" data-desc-text th:if="${description != null}" th:text="${description}">Description</p>
+            <button type="button" class="list-name-edit" data-desc-toggle aria-label="Edit description">
+                <th:block th:replace="~{pencil-icon :: icon}"></th:block>
+            </button>
+            <form method="post" th:action="'/playlists/' + ${id} + '/description'" class="playlist-desc-form" data-desc-form hidden>
+                <textarea name="description" maxlength="1000" rows="2" aria-label="Playlist description"
+                          placeholder="What is this playlist about?" th:text="${description}"></textarea>
+                <button type="submit" class="chip-button">Save</button>
+            </form>
+        </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c}, ${id})}"></li>
+                <li th:replace="~{movie-card :: card(${c}, ${id}, ${notes[c.tmdbId()]}, '/playlists/' + ${id} + '/movies/' + ${c.tmdbId()} + '/note/edit')}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">
             <p>This playlist is empty.</p>
             <p>Add movies to it from their pages.</p>
         </div>
-        <dialog id="share" th:attr="data-share-url=@{/list(movie=${movieIds},name=${name})}">
-            <div class="dialog-head">
-                <h2>Share</h2>
-                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
-            </div>
-            <div class="qr-wrap" data-qr-target></div>
-            <div class="qr-url-row">
-                <a class="qr-url" data-qr-url-text href="#" target="_blank" rel="noopener"></a>
-                <button type="button" class="chip-button" data-qr-copy aria-live="polite">Copy</button>
-            </div>
-        </dialog>
+        <th:block th:replace="~{share-dialog :: shareDialog(@{/list(movie=${movieIds},name=${name})})}"></th:block>
     </section>
 </main>
 <footer th:replace="~{footer :: footer}"></footer>

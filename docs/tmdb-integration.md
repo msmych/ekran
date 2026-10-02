@@ -21,6 +21,18 @@ Everything TMDB-specific lives in the `tmdb` package. Nothing outside it knows T
 - `language=en-US` fixed for MVP (no localization work).
 - `append_to_response` is the tool that keeps call counts at 1 — this is a TMDB-adapter-internal detail; the repository interface stays `findById`.
 
+## Caching (`MovieService`)
+
+TMDB has no batch "details by ids" endpoint, so list surfaces (`/list`, `/marked`, playlists)
+would otherwise pay one sequential detail call per card — up to `MovieIds.MAX_SET = 100`.
+`MovieService` wraps the repository with a Caffeine cache keyed by TMDB id
+(24 h expiry, 10 000 entries):
+
+- movie metadata is immutable for all practical purposes — the day-long TTL is safe;
+- a cold list page is bounded by cache misses alone; repeat visits are instant;
+- a missing movie still surfaces as `NotFoundException` → 404 (the cache stores
+  `Optional<Movie>`, exceptions are unwrapped and propagate as themselves).
+
 ## Images
 
 - TMDB returns relative paths (`poster_path: "/abc.jpg"`); the adapter resolves them to absolute URLs at mapping time: `https://image.tmdb.org/t/p/{size}{path}`.

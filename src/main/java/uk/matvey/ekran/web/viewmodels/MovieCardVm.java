@@ -2,7 +2,6 @@ package uk.matvey.ekran.web.viewmodels;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
 import uk.matvey.ekran.domain.FilmographyItem;
 import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.PersonLink;

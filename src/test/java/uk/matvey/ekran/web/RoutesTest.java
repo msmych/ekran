@@ -1,9 +1,21 @@
 package uk.matvey.ekran.web;
 
+import static java.util.stream.Collectors.joining;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.javalin.Javalin;
 import io.javalin.testtools.JavalinTest;
+import java.net.URI;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
-
+import uk.matvey.ekran.auth.AuthService;
+import uk.matvey.ekran.auth.CapturingEmailService;
+import uk.matvey.ekran.auth.InMemoryAuthRepository;
 import uk.matvey.ekran.domain.Department;
 import uk.matvey.ekran.domain.Filmography;
 import uk.matvey.ekran.domain.FilmographyItem;
@@ -16,9 +28,6 @@ import uk.matvey.ekran.domain.SearchResult;
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
-import uk.matvey.ekran.auth.AuthService;
-import uk.matvey.ekran.auth.CapturingEmailService;
-import uk.matvey.ekran.auth.InMemoryAuthRepository;
 import uk.matvey.ekran.marks.InMemoryMarksRepository;
 import uk.matvey.ekran.marks.MarksService;
 import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
@@ -29,17 +38,6 @@ import uk.matvey.ekran.repository.SearchRepository;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.service.PersonService;
 import uk.matvey.ekran.service.SearchService;
-
-import java.net.URI;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.util.Optional;
-import java.util.stream.IntStream;
-
-import static java.util.stream.Collectors.joining;
-import static org.assertj.core.api.Assertions.assertThat;
-import java.util.List;
 
 class RoutesTest {
 
@@ -400,7 +398,7 @@ class RoutesTest {
             var body = response.body().string();
             assertThat(body).contains(">Trailers (3)<");
             assertThat(body).doesNotContain("▶");
-            assertThat(body).contains("<dialog id=\"trailers\">");
+            assertThat(body).contains("<dialog id=\"trailers\" aria-labelledby=\"trailers-dialog-title\">");
             // best-ranked video frame loads on dialog open, but does not autoplay
             assertThat(body).contains("https://www.youtube-nocookie.com/embed/trailerKey1?enablejsapi=1\"");
             assertThat(body).doesNotContain("autoplay=1");
@@ -496,7 +494,7 @@ class RoutesTest {
             assertThat(body).contains("data-list-title");
             assertThat(body).contains("data-list-name-edit");
             assertThat(body).contains("data-list-name-input");
-            assertThat(body).contains("<dialog id=\"share\">");
+            assertThat(body).contains("<dialog id=\"share\" aria-labelledby=\"share-dialog-title\">");
             assertThat(body).contains("data-qr-copy");
             assertThat(body).contains("1979");
             assertThat(body).contains("1h 57m");

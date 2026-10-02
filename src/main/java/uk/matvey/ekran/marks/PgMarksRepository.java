@@ -1,13 +1,9 @@
 package uk.matvey.ekran.marks;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
-
 import javax.sql.DataSource;
+import uk.matvey.ekran.db.Jdbc;
+import uk.matvey.ekran.domain.MovieNote;
 
 public class PgMarksRepository implements MarksRepository {
 
@@ -19,80 +15,68 @@ public class PgMarksRepository implements MarksRepository {
 
     @Override
     public List<Long> markedMovieIds(long userId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("""
-                 SELECT movie_id FROM marked_movies
-                 WHERE user_id = ?
-                 ORDER BY created_at, movie_id""")) {
-            ps.setLong(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                var ids = new ArrayList<Long>();
-                while (rs.next()) {
-                    ids.add(rs.getLong(1));
-                }
-                return ids;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot load marked movies: " + e.getMessage(), e);
-        }
+        return Jdbc.queryList(dataSource, "load marked movies", rs -> rs.getLong(1), """
+            SELECT movie_id FROM marked_movies
+            WHERE user_id = ?
+            ORDER BY created_at, movie_id""", userId);
+    }
+
+    @Override
+    public List<MovieNote> markedMovies(long userId) {
+        return Jdbc.queryList(dataSource, "load marked movies",
+            rs -> new MovieNote(rs.getLong(1), rs.getString(2)), """
+                SELECT movie_id, note FROM marked_movies
+                WHERE user_id = ?
+                ORDER BY created_at, movie_id""", userId);
+    }
+
+    @Override
+    public String markNote(long userId, long movieId) {
+        return Jdbc.queryOne(dataSource, "load mark note", rs -> rs.getString(1),
+            "SELECT note FROM marked_movies WHERE user_id = ? AND movie_id = ?", userId, movieId)
+            .orElse(null);
+    }
+
+    @Override
+    public boolean setMarkNote(long userId, long movieId, String note) {
+        return Jdbc.update(dataSource, "set mark note",
+            "UPDATE marked_movies SET note = ? WHERE user_id = ? AND movie_id = ?", note, userId, movieId) == 1;
     }
 
     @Override
     public void mark(long userId, long movieId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "INSERT INTO marked_movies (user_id, movie_id) VALUES (?, ?) ON CONFLICT DO NOTHING")) {
-            ps.setLong(1, userId);
-            ps.setLong(2, movieId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot mark movie: " + e.getMessage(), e);
-        }
+        Jdbc.update(dataSource, "mark movie",
+            "INSERT INTO marked_movies (user_id, movie_id) VALUES (?, ?) ON CONFLICT DO NOTHING", userId, movieId);
     }
 
     @Override
     public void unmark(long userId, long movieId) {
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "DELETE FROM marked_movies WHERE user_id = ? AND movie_id = ?")) {
-            ps.setLong(1, userId);
-            ps.setLong(2, movieId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot unmark movie: " + e.getMessage(), e);
-        }
+        Jdbc.update(dataSource, "unmark movie",
+            "DELETE FROM marked_movies WHERE user_id = ? AND movie_id = ?", userId, movieId);
     }
 
     @Override
     public void markAll(long userId, List<Long> movieIds) {
-        mutateAll("INSERT INTO marked_movies (user_id, movie_id) VALUES (?, ?) ON CONFLICT DO NOTHING", userId, movieIds);
+        Jdbc.batch(dataSource, "mark movies",
+            "INSERT INTO marked_movies (user_id, movie_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+            movieIds.stream().map(id -> new Object[]{userId, id}).toList());
     }
 
     @Override
     public void unmarkAll(long userId, List<Long> movieIds) {
-        mutateAll("DELETE FROM marked_movies WHERE user_id = ? AND movie_id = ?", userId, movieIds);
+        Jdbc.batch(dataSource, "unmark movies",
+            "DELETE FROM marked_movies WHERE user_id = ? AND movie_id = ?",
+            movieIds.stream().map(id -> new Object[]{userId, id}).toList());
     }
 
-    private void mutateAll(String sql, long userId, List<Long> movieIds) {
-        if (movieIds.isEmpty()) {
-            return;
-        }
-        try (Connection conn = dataSource.getConnection()) {
-            conn.setAutoCommit(false);
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                for (var movieId : movieIds) {
-                    ps.setLong(1, userId);
-                    ps.setLong(2, movieId);
-                    ps.addBatch();
-                }
-                ps.executeBatch();
-                conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Cannot update marked movies: " + e.getMessage(), e);
-        }
+    @Override
+    public void mergeMarks(long userId, List<MovieNote> movies) {
+        // ON CONFLICT DO NOTHING keeps the existing mark AND its note — the
+        // local (browser) note never overwrites a note already saved server-side
+        Jdbc.batch(dataSource, "merge marked movies", """
+            INSERT INTO marked_movies (user_id, movie_id, note)
+            VALUES (?, ?, ?)
+            ON CONFLICT (user_id, movie_id) DO NOTHING""",
+            movies.stream().map(m -> new Object[]{userId, m.movieId(), m.note()}).toList());
     }
 }

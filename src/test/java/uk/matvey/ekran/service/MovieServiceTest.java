@@ -1,15 +1,13 @@
 package uk.matvey.ekran.service;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
 import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.repository.MovieRepository;
-
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import java.util.List;
 
 class MovieServiceTest {
 

@@ -1,16 +1,16 @@
 package uk.matvey.ekran.web;
 
+import io.javalin.Javalin;
+import io.javalin.http.BadRequestResponse;
+import io.javalin.http.Context;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import io.javalin.Javalin;
-import io.javalin.http.Context;
-import io.javalin.http.HttpStatus;
-
 import uk.matvey.ekran.domain.MovieIds;
+import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.playlists.PlaylistDetail;
 import uk.matvey.ekran.playlists.PlaylistMembership;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.service.MovieService;
@@ -21,7 +21,7 @@ import uk.matvey.ekran.web.viewmodels.MovieCardVm;
  * everywhere: the user id always comes from the session, playlist lookups are
  * scoped by it, and a foreign playlist behaves exactly like a missing one (404).
  */
-public class PlaylistRoutes {
+public class PlaylistRoutes extends Routes {
 
     private final PlaylistsService playlistsService;
     private final MovieService movieService;
@@ -39,17 +39,21 @@ public class PlaylistRoutes {
         app.get("/playlists/select", this::select);
         app.get("/playlists/{id}", this::detail);
         app.post("/playlists/{id}/rename", this::rename);
+        app.post("/playlists/{id}/description", this::updateDescription);
         app.post("/playlists/{id}/delete", this::delete);
         app.post("/playlists/{id}/movies", this::addMovies);
         app.post("/playlists/{id}/movies/{movieId}", this::addMovie);
         app.delete("/playlists/{id}/movies/{movieId}", this::removeMovie);
+        app.get("/playlists/{id}/movies/{movieId}/note", this::noteArea);
+        app.get("/playlists/{id}/movies/{movieId}/note/edit", this::noteEditor);
+        app.post("/playlists/{id}/movies/{movieId}/note", this::setMovieNote);
         app.post("/playlists/{id}/movies/{movieId}/move", this::moveMovie);
     }
 
     private void index(Context ctx) {
         var userId = userId(ctx);
         if (userId == null) {
-            ctx.redirect("/signin?next=%2Fplaylists", HttpStatus.SEE_OTHER);
+            redirectToSignin(ctx, "/playlists");
             return;
         }
         ctx.render("playlists", Map.of("playlists", playlistsService.playlists(userId)));
@@ -59,29 +63,35 @@ public class PlaylistRoutes {
         var userId = userId(ctx);
         var id = parseId(ctx);
         if (userId == null) {
-            ctx.redirect("/signin?next=%2Fplaylists%2F" + id, HttpStatus.SEE_OTHER);
+            redirectToSignin(ctx, "/playlists/" + id);
             return;
         }
         var playlist = playlistsService.playlist(userId, id)
             .orElseThrow(() -> new NotFoundException("Playlist not found: " + id));
         // one TMDB call per card — the same cap as /list keeps the page bounded
-        var movieIds = playlist.movieIds().stream().limit(MovieIds.MAX_SET).toList();
+        var movies = playlist.movies().stream().limit(MovieIds.MAX_SET).toList();
+        var movieIds = movies.stream().map(MovieNote::movieId).toList();
         var cards = movieService.findByIds(movieIds).stream().map(MovieCardVm::of).toList();
-        ctx.render("playlist", Map.of(
-            "id", id,
-            "name", playlist.name(),
-            "cards", cards,
-            "movieIds", movieIds));
+        var notes = new HashMap<Long, String>();
+        movies.forEach(m -> {
+            if (m.note() != null) {
+                notes.put(m.movieId(), m.note());
+            }
+        });
+        var model = new HashMap<String, Object>();
+        model.put("id", id);
+        model.put("name", playlist.name());
+        model.put("description", playlist.description());
+        model.put("cards", cards);
+        model.put("notes", notes);
+        model.put("movieIds", movieIds);
+        ctx.render("playlist", model);
     }
 
     // dialog body: exactly one movie param → toggle-membership mode (movie page);
     // several → pick-a-playlist bulk mode (shared lists, marked page)
     private void select(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var ids = MovieIds.validOf(ctx.queryParams("movie"));
         if (ids.isEmpty()) {
             ctx.status(400);
@@ -90,51 +100,44 @@ public class PlaylistRoutes {
         if (ids.size() == 1) {
             ctx.render("playlist-select", singleMovieSelect(userId, ids.getFirst()));
         } else {
-            var memberships = playlistsService.playlists(userId).stream()
-                .map(p -> new PlaylistMembership(p.id(), p.name(), false))
-                .toList();
-            var model = new HashMap<String, Object>();
-            model.put("memberships", memberships);
-            model.put("movieId", null);
-            model.put("movieIds", ids);
-            // "Add all to playlist" from /marked: after the movies land in a
-            // playlist the marks are cleared (compose marks → name the list)
-            model.put("clearMarked", "marked".equals(ctx.queryParam("from")) && ids.size() > 1);
-            ctx.render("playlist-select", model);
+            ctx.render("playlist-select", bulkSelect(userId, ids, null, null));
         }
     }
 
+    // composing a playlist out of marked movies is a copy, not a move: the
+    // marks stay, and each mark's note is carried into the new membership
     private void create(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var name = PlaylistsService.validName(ctx.formParam("name"));
         if (name.isEmpty()) {
             ctx.status(400);
             return;
         }
-        var movieIds = MovieIds.validOf(ctx.formParams("movie"));
-        var id = playlistsService.createPlaylist(userId, name.get());
-        if (!movieIds.isEmpty()) {
-            playlistsService.addMovies(userId, id, movieIds);
+        var description = PlaylistsService.normalizedDescription(ctx.formParam("description"));
+        if (invalidDescription(description)) {
+            ctx.status(400);
+            return;
         }
-        clearMarkedIfRequested(ctx, userId, movieIds);
+        var movieIds = MovieIds.validOf(ctx.formParams("movie"));
+        // one transaction: the playlist is created with its movies or not at all
+        var id = playlistsService.createPlaylist(userId, name.get(), description, withMarkNotes(userId, movieIds));
         if (movieIds.size() == 1) {
             // movie-page dialog: stay in the dialog, show the new playlist checked
             ctx.render("playlist-select", singleMovieSelect(userId, movieIds.getFirst()));
+            return;
+        }
+        if (movieIds.size() > 1 && htmx(ctx)) {
+            // bulk dialog: stay on the page the dialog was opened from, with a
+            // confirmation — the picker keeps its movie set, so more adds work
+            ctx.render("playlist-select", bulkSelect(userId, movieIds,
+                "Created " + name.get() + " with " + movieIds.size() + " movies", "/playlists/" + id));
             return;
         }
         navigate(ctx, "/playlists/" + id);
     }
 
     private void rename(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var id = parseId(ctx);
         var name = PlaylistsService.validName(ctx.formParam("name"));
         if (name.isPresent()) {
@@ -145,12 +148,22 @@ public class PlaylistRoutes {
         navigate(ctx, "/playlists/" + id);
     }
 
-    private void delete(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
+    private void updateDescription(Context ctx) {
+        var userId = requireUser(ctx);
+        var id = parseId(ctx);
+        var description = PlaylistsService.normalizedDescription(ctx.formParam("description"));
+        if (invalidDescription(description)) {
+            ctx.status(400);
             return;
         }
+        if (!playlistsService.updateDescription(userId, id, description)) {
+            throw new NotFoundException("Playlist not found: " + id);
+        }
+        navigate(ctx, "/playlists/" + id);
+    }
+
+    private void delete(Context ctx) {
+        var userId = requireUser(ctx);
         var id = parseId(ctx);
         if (!playlistsService.deletePlaylist(userId, id)) {
             throw new NotFoundException("Playlist not found: " + id);
@@ -159,15 +172,19 @@ public class PlaylistRoutes {
     }
 
     private void addMovies(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var id = parseId(ctx);
         var movieIds = MovieIds.validOf(ctx.formParams("movie"));
-        playlistsService.addMovies(userId, id, movieIds);
-        clearMarkedIfRequested(ctx, userId, movieIds);
+        playlistsService.addMovies(userId, id, withMarkNotes(userId, movieIds));
+        if (htmx(ctx)) {
+            // bulk dialog: stay on the page, confirm in the picker
+            var name = playlistsService.playlist(userId, id)
+                .map(PlaylistDetail::name)
+                .orElse("");
+            ctx.render("playlist-select", bulkSelect(userId, movieIds,
+                "Added " + movieIds.size() + " movies to " + name, "/playlists/" + id));
+            return;
+        }
         navigate(ctx, "/playlists/" + id);
     }
 
@@ -179,15 +196,55 @@ public class PlaylistRoutes {
         mutateMembership(ctx, playlistsService::removeMovie);
     }
 
+    // the inline membership-note editor, mirroring the mark-note fragments:
+    // GET /note renders the display area (the ✕ cancel target), GET /note/edit
+    // swaps it into the form, POST saves and renders the display area back
+    private void noteArea(Context ctx) {
+        var userId = requireUser(ctx);
+        var id = parseId(ctx);
+        var movieId = movieId(ctx);
+        var note = membershipNote(userId, id, movieId);
+        renderNoteArea(ctx, note, editUrl(id, movieId));
+    }
+
+    private void noteEditor(Context ctx) {
+        var userId = requireUser(ctx);
+        var id = parseId(ctx);
+        var movieId = movieId(ctx);
+        var note = membershipNote(userId, id, movieId);
+        renderNoteEditor(ctx, note, noteUrl(id, movieId));
+    }
+
+    private String membershipNote(long userId, long playlistId, long movieId) {
+        var playlist = playlistsService.playlist(userId, playlistId)
+            .orElseThrow(() -> new NotFoundException("Playlist not found: " + playlistId));
+        return playlist.movies().stream()
+            .filter(m -> m.movieId() == movieId)
+            .findFirst()
+            .map(MovieNote::note)
+            .orElse(null);
+    }
+
+    private void setMovieNote(Context ctx) {
+        var userId = requireUser(ctx);
+        var id = parseId(ctx);
+        var movieId = movieId(ctx);
+        var note = MovieNote.normalize(ctx.formParam("note"));
+        if (!MarksService.validNote(note)) {
+            ctx.status(400);
+            return;
+        }
+        if (!playlistsService.setMovieNote(userId, id, movieId, note)) {
+            throw new NotFoundException("Playlist not found: " + id);
+        }
+        renderNoteArea(ctx, note, editUrl(id, movieId));
+    }
+
     // reorder mode: the button posts here, the server swaps the position
     // (wrapping at the edges); the response is empty — the client mirrors
     // the move in the DOM, no re-render needed
     private void moveMovie(Context ctx) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var id = parseId(ctx);
         var rawMovieId = ctx.pathParam("movieId");
         if (!MovieIds.isValid(rawMovieId)) {
@@ -203,11 +260,7 @@ public class PlaylistRoutes {
     }
 
     private void mutateMembership(Context ctx, MembershipOperation operation) {
-        var userId = userId(ctx);
-        if (userId == null) {
-            ctx.status(401);
-            return;
-        }
+        var userId = requireUser(ctx);
         var id = parseId(ctx);
         var rawMovieId = ctx.pathParam("movieId");
         if (!MovieIds.isValid(rawMovieId)) {
@@ -232,35 +285,54 @@ public class PlaylistRoutes {
             "movieIds", List.of(movieId));
     }
 
-    // the /marked dialog sends clearMarked=true: composing a playlist out of
-    // your marks consumes them — only the movies actually added are unmarked
-    private void clearMarkedIfRequested(Context ctx, long userId, List<Long> movieIds) {
-        if ("true".equals(ctx.formParam("clearMarked")) && !movieIds.isEmpty()) {
-            marksService.unmarkAll(userId, movieIds);
-        }
+    // the bulk (shared lists, marked page) dialog model: one pick button per
+    // playlist, the movie set kept as hidden inputs so further adds carry it
+    private Map<String, Object> bulkSelect(long userId, List<Long> movieIds, String confirmation, String playlistUrl) {
+        var memberships = playlistsService.playlists(userId).stream()
+            .map(p -> new PlaylistMembership(p.id(), p.name(), false, null))
+            .toList();
+        var model = new HashMap<String, Object>();
+        model.put("memberships", memberships);
+        model.put("movieId", null);
+        model.put("movieIds", movieIds);
+        model.put("confirmation", confirmation);
+        model.put("playlistUrl", playlistUrl);
+        return model;
     }
 
-    // fetch-based dialog calls get HX-Redirect (htmx navigates); boosted/plain
-    // forms get a plain 303 the browser follows
-    private static void navigate(Context ctx, String location) {
-        if ("true".equalsIgnoreCase(ctx.header("HX-Request"))) {
-            ctx.header("HX-Redirect", location);
-        } else {
-            ctx.redirect(location, HttpStatus.SEE_OTHER);
-        }
+    // new memberships carry the movie's mark note, where one exists; the marks
+    // themselves are never touched
+    private List<MovieNote> withMarkNotes(long userId, List<Long> movieIds) {
+        var markNotes = new HashMap<Long, String>();
+        marksService.markedMovies(userId).forEach(m -> {
+            if (m.note() != null) {
+                markNotes.put(m.movieId(), m.note());
+            }
+        });
+        return movieIds.stream().map(id -> new MovieNote(id, markNotes.get(id))).toList();
     }
 
-    private static long parseId(Context ctx) {
-        var raw = ctx.pathParam("id");
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            throw new NotFoundException("Invalid playlist id: " + raw);
-        }
+    // a description is optional: absent/blank means none; only too long is invalid
+    private boolean invalidDescription(String description) {
+        return description != null && description.length() > PlaylistsService.MAX_DESCRIPTION;
     }
 
-    private static Long userId(Context ctx) {
-        return ctx.<Long>attribute("userId");
+    private static String noteUrl(long playlistId, long movieId) {
+        return "/playlists/" + playlistId + "/movies/" + movieId + "/note";
+    }
+
+    private static String editUrl(long playlistId, long movieId) {
+        return noteUrl(playlistId, movieId) + "/edit";
+    }
+
+    // a malformed movie id in a fragment route is a client wiring problem, not
+    // a missing resource — 400, same as the mark-note routes
+    private static long movieId(Context ctx) {
+        var raw = ctx.pathParam("movieId");
+        if (!MovieIds.isValid(raw)) {
+            throw new BadRequestResponse("Invalid movie id: " + raw);
+        }
+        return Long.parseLong(raw);
     }
 
     @FunctionalInterface

@@ -18,12 +18,16 @@ public final class MovieIds {
         return raw != null && VALID.matcher(raw.trim()).matches();
     }
 
-    /** Filters to well-formed, distinct ids, preserving order. Bulk sources are untrusted. */
+    /**
+     * Filters to well-formed, distinct ids, preserving order, capped at
+     * {@link #MAX_SET}. Bulk sources are untrusted and unbounded.
+     */
     public static List<Long> validOf(List<String> params) {
         return params.stream()
             .filter(MovieIds::isValid)
             .map(raw -> Long.parseLong(raw.trim()))
             .distinct()
+            .limit(MAX_SET)
             .toList();
     }
 }

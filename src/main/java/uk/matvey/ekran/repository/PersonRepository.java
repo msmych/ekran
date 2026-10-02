@@ -1,8 +1,7 @@
 package uk.matvey.ekran.repository;
 
-import uk.matvey.ekran.domain.Person;
-
 import java.util.Optional;
+import uk.matvey.ekran.domain.Person;
 
 public interface PersonRepository {
 

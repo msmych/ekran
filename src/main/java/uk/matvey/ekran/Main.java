@@ -1,13 +1,10 @@
 package uk.matvey.ekran;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.javalin.Javalin;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.http.HttpClient;
 import java.time.Clock;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import uk.matvey.ekran.auth.AuthService;
 import uk.matvey.ekran.auth.PgAuthRepository;
 import uk.matvey.ekran.config.AppConfig;
