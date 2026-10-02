@@ -30,7 +30,7 @@
             <h3 th:text="${s.label()}">Directing</h3>
             <ul class="movie-cards">
                 <th:block th:each="i : ${s.items()}">
-                    <li th:replace="~{movie-card :: card(${i})}"></li>
+                    <li th:replace="~{movie-card :: card(${i}, null)}"></li>
                 </th:block>
             </ul>
         </section>

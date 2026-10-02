@@ -37,7 +37,9 @@ public class MovieRoutes extends Routes {
             // the middleware already loaded this user's full marked set
             var markedIds = ctx.<java.util.List<Long>>attribute("markedIds");
             model.put("marked", markedIds.contains(id));
-            model.put("memberships", playlistsService.playlistsWithMovie(userId, id));
+            var memberships = playlistsService.playlistsWithMovie(userId, id);
+            model.put("memberships", memberships);
+            model.put("hasMembers", PlaylistsService.hasMemberships(memberships));
         }
         ctx.render("movie", model);
     }

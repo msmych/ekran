@@ -586,13 +586,13 @@ body {
     margin: 12px 0 0;
 }
 
+/* sits inline with the trailers chip in the actions row; padding gives the
+   icon-only control a usable tap target without adding visual weight */
 .mark-toggle {
     display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
-    flex-basis: 100%;
-    padding: 2px;
-    margin-top: 4px;
+    justify-content: center;
+    padding: 4px 8px;
     border: none;
     background: none;
     color: var(--muted);
@@ -831,6 +831,41 @@ html:has(dialog[open]) body {
     flex-direction: column;
 }
 
+/* playlist Reorder mode: per-card ‹ › overlays over the poster, revealed
+   only while the mode is on; both arrows are always live — the edges wrap */
+.card-move {
+    display: none;
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    gap: 4px;
+    z-index: 1;
+}
+
+[data-reordering] .card-move {
+    display: flex;
+}
+
+.card-move-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+    background: var(--bg);
+    cursor: pointer;
+}
+
+.card-move-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .card-link {
     display: block;
     text-decoration: none;
@@ -1049,6 +1084,24 @@ kbd {
     }
 }
 
+/* narrow screens: the search can't squeeze into the header row — it wraps to
+   its own full-width line, so focusing can't expand out of the viewport
+   (placed after the query above so the fixed width wins over the expansion) */
+@media (max-width: 640px) {
+    .header-row {
+        flex-wrap: wrap;
+    }
+
+    .site-search {
+        flex-basis: 100%;
+    }
+
+    .site-search #search-input,
+    .site-search #search-input:focus {
+        width: 100%;
+    }
+}
+
 .tmdb-footer img {
     height: 12px;
 }
@@ -1066,6 +1119,7 @@ kbd {
     .list-name-edit,
     .list-name-input,
     .card-mark,
+    .card-move,
     .card-poster,
     .tmdb-footer {
         display: none !important;
@@ -1130,6 +1184,7 @@ kbd {
     gap: 6px;
 }
 
+/* the member chip is an <a> into the playlist, the trailing button opens the dialog */
 .playlist-chip {
     display: inline-flex;
     align-items: center;
@@ -1140,6 +1195,7 @@ kbd {
     font-size: 12px;
     color: var(--muted);
     background: none;
+    text-decoration: none;
     cursor: pointer;
 }
 
@@ -1151,11 +1207,6 @@ kbd {
 .playlist-chip.on {
     color: var(--text);
     border-color: var(--text);
-}
-
-.playlist-chip .chip-x {
-    font-size: 11px;
-    line-height: 1;
 }
 
 /* account menu: marked + playlists links */
@@ -1274,7 +1325,12 @@ kbd {
     align-items: center;
 }
 
+.playlist-new-form {
+    margin-top: 12px;
+}
+
 .playlist-new-form input[type="text"] {
+    flex: 1;
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 8px;

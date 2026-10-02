@@ -36,7 +36,7 @@
         </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c})}"></li>
+                <li th:replace="~{movie-card :: card(${c}, null)}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">

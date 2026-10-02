@@ -137,8 +137,60 @@ class PgPlaylistsRepositoryTest {
         assertThat(repository.playlist(alice, id)).map(PlaylistDetail::movieIds).contains(List.of(238L));
     }
 
-    @Test
-    void indexIsOrderedByRecentlyUpdated() {
+@Test
+void moveMovieSwapsAndWraps() {
+    var userId = authRepository.insertUser("reorder@bar.com");
+    var id = repository.createPlaylist(userId, "Ordered");
+    repository.addMovies(userId, id, List.of(238L, 680L, 155L));
+
+    // adjacent swap in the middle
+    assertThat(repository.moveMovie(userId, id, 680L, true)).isTrue();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(680L, 238L, 155L));
+
+    // first moves up → wraps to the end
+    assertThat(repository.moveMovie(userId, id, 680L, true)).isTrue();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(238L, 155L, 680L));
+
+    // last moves down → wraps to the front
+    assertThat(repository.moveMovie(userId, id, 680L, false)).isTrue();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(680L, 238L, 155L));
+
+    // adjacent swap down in the middle
+    assertThat(repository.moveMovie(userId, id, 238L, false)).isTrue();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(680L, 155L, 238L));
+
+    // positions have gaps after removals — wrapping still lands correctly
+    repository.removeMovie(userId, id, 155L);
+    assertThat(repository.moveMovie(userId, id, 238L, false)).isTrue();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(238L, 680L));
+
+    // unknown movie and single-member playlists are no-ops
+    assertThat(repository.moveMovie(userId, id, 999L, true)).isFalse();
+    assertThat(repository.playlist(userId, id)).map(PlaylistDetail::movieIds).contains(List.of(238L, 680L));
+    var single = repository.createPlaylist(userId, "Single");
+    repository.addMovie(userId, single, 238L);
+    assertThat(repository.moveMovie(userId, single, 238L, true)).isFalse();
+}
+
+@Test
+void moveMovieIsOwnershipScoped() {
+    var alice = authRepository.insertUser("mover@bar.com");
+    var bob = authRepository.insertUser("meddler@bar.com");
+    var id = repository.createPlaylist(alice, "Private order");
+    repository.addMovies(alice, id, List.of(238L, 680L));
+
+    var caught = false;
+    try {
+        repository.moveMovie(bob, id, 680L, true);
+    } catch (uk.matvey.ekran.domain.NotFoundException e) {
+        caught = true;
+    }
+    assertThat(caught).isTrue();
+    assertThat(repository.playlist(alice, id)).map(PlaylistDetail::movieIds).contains(List.of(238L, 680L));
+}
+
+@Test
+void indexIsOrderedByRecentlyUpdated() {
         var userId = authRepository.insertUser("recent@bar.com");
         var first = repository.createPlaylist(userId, "Old");
         var second = repository.createPlaylist(userId, "New");

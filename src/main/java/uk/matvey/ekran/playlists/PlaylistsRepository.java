@@ -35,4 +35,11 @@ public interface PlaylistsRepository {
 
     /** Idempotent, ownership-checked. */
     void removeMovie(long userId, long playlistId, long movieId);
+
+    /**
+     * Moves the movie one slot up or down, wrapping around at the edges
+     * (first up → last, last down → first). False if the movie is not in
+     * the playlist or is its only member — nothing to swap with.
+     */
+    boolean moveMovie(long userId, long playlistId, long movieId, boolean up);
 }

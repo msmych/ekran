@@ -24,6 +24,7 @@
                 <button type="submit" class="chip-button">Save</button>
             </form>
             <div class="list-actions playlist-actions">
+                <button type="button" class="chip-button" data-reorder-toggle th:hidden="${cards.isEmpty()}">Reorder</button>
                 <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
                 <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
@@ -34,7 +35,7 @@
         </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c})}"></li>
+                <li th:replace="~{movie-card :: card(${c}, ${id})}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">

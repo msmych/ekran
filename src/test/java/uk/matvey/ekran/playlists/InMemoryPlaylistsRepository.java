@@ -100,14 +100,40 @@ public class InMemoryPlaylistsRepository implements PlaylistsRepository {
     }
 
     @Override
-    public void removeMovie(long userId, long playlistId, long movieId) {
-        var playlist = playlists.get(playlistId);
-        if (playlist == null || playlist.userId() != userId) {
-            throw new uk.matvey.ekran.domain.NotFoundException("Playlist not found: " + playlistId);
-        }
-        moviesOf(playlistId).remove(movieId);
-        playlists.put(playlistId, new StoredPlaylist(playlistId, userId, playlist.name(), ++clock));
+public void removeMovie(long userId, long playlistId, long movieId) {
+    var playlist = playlists.get(playlistId);
+    if (playlist == null || playlist.userId() != userId) {
+        throw new uk.matvey.ekran.domain.NotFoundException("Playlist not found: " + playlistId);
     }
+    moviesOf(playlistId).remove(movieId);
+    playlists.put(playlistId, new StoredPlaylist(playlistId, userId, playlist.name(), ++clock));
+}
+
+@Override
+public boolean moveMovie(long userId, long playlistId, long movieId, boolean up) {
+    var playlist = playlists.get(playlistId);
+    if (playlist == null || playlist.userId() != userId) {
+        throw new uk.matvey.ekran.domain.NotFoundException("Playlist not found: " + playlistId);
+    }
+    var order = movieIdsOf(playlistId);
+    var index = order.indexOf(movieId);
+    if (index < 0 || order.size() < 2) {
+        return false;
+    }
+    // wrap-around at the edges, like the Pg repository
+    var target = up ? (index == 0 ? order.size() - 1 : index - 1)
+        : (index == order.size() - 1 ? 0 : index + 1);
+    var reordered = new ArrayList<>(order);
+    reordered.remove(index);
+    reordered.add(target, movieId);
+    var movies = new LinkedHashMap<Long, Integer>();
+    for (var i = 0; i < reordered.size(); i++) {
+        movies.put(reordered.get(i), i + 1);
+    }
+    moviesByPlaylistId.put(playlistId, movies);
+    playlists.put(playlistId, new StoredPlaylist(playlistId, userId, playlist.name(), ++clock));
+    return true;
+}
 
     private Map<Long, Integer> moviesOf(long playlistId) {
         return moviesByPlaylistId.computeIfAbsent(playlistId, id -> new LinkedHashMap<>());

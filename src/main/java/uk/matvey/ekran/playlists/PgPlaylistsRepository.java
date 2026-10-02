@@ -225,6 +225,87 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
         }
     }
 
+    @Override
+    public boolean moveMovie(long userId, long playlistId, long movieId, boolean up) {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                if (!owned(conn, userId, playlistId)) {
+                    throw new NotFoundException("Playlist not found: " + playlistId);
+                }
+                var moved = movePosition(conn, playlistId, movieId, up);
+                if (moved) {
+                    touch(conn, userId, playlistId);
+                }
+                conn.commit();
+                return moved;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot move movie in playlist: " + e.getMessage(), e);
+        }
+    }
+
+    // positions are unique per playlist but may have gaps (MAX+1 inserts,
+    // deletions), so a move is a swap of the two rows' positions — except at
+    // the edges, where wrap-around is a single reposition beyond the end
+    private static boolean movePosition(Connection conn, long playlistId, long movieId, boolean up)
+            throws SQLException {
+        List<MoviePosition> rows;
+        try (PreparedStatement ps = conn.prepareStatement(
+            "SELECT movie_id, position FROM playlist_movies WHERE playlist_id = ? ORDER BY position")) {
+            ps.setLong(1, playlistId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rows = new ArrayList<>();
+                while (rs.next()) {
+                    rows.add(new MoviePosition(rs.getLong(1), rs.getInt(2)));
+                }
+            }
+        }
+        var index = -1;
+        for (var i = 0; i < rows.size(); i++) {
+            if (rows.get(i).movieId() == movieId) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0 || rows.size() < 2) {
+            return false;
+        }
+        // (playlist_id, position) is UNIQUE, so an adjacent swap steps through
+        // a temporary position beyond the end — every intermediate state is
+        // collision-free
+        var first = rows.getFirst().position();
+        var last = rows.getLast().position();
+        if (up && index == 0) {
+            setPosition(conn, playlistId, movieId, last + 1); // wrap to the end
+        } else if (!up && index == rows.size() - 1) {
+            setPosition(conn, playlistId, movieId, first - 1); // wrap to the front
+        } else {
+            var own = rows.get(index);
+            var neighbor = rows.get(up ? index - 1 : index + 1);
+            setPosition(conn, playlistId, movieId, last + 1); // step aside
+            setPosition(conn, playlistId, neighbor.movieId(), own.position());
+            setPosition(conn, playlistId, movieId, neighbor.position());
+        }
+        return true;
+    }
+
+    private static void setPosition(Connection conn, long playlistId, long movieId, int position) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+            "UPDATE playlist_movies SET position = ? WHERE playlist_id = ? AND movie_id = ?")) {
+            ps.setInt(1, position);
+            ps.setLong(2, playlistId);
+            ps.setLong(3, movieId);
+            ps.executeUpdate();
+        }
+    }
+
+    private record MoviePosition(long movieId, int position) {
+    }
+
     private static boolean owned(Connection conn, long userId, long playlistId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
             "SELECT 1 FROM playlists WHERE id = ? AND user_id = ?")) {

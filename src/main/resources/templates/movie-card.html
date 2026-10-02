@@ -1,7 +1,19 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <body>
-<li th:fragment="card(c)" th:attr="data-movie-id=${c.tmdbId()}">
+<li th:fragment="card(c, playlistId)" th:attr="data-movie-id=${c.tmdbId()}">
+    <!-- playlist reorder controls: only rendered on the playlist page (playlistId set),
+         hidden until Reorder mode is toggled on; both arrows are live — the edges wrap -->
+    <div class="card-move" th:if="${playlistId != null}">
+        <button type="button" class="card-move-btn" data-move="up" aria-label="Move earlier in the playlist"
+                th:attr="hx-post='/playlists/' + ${playlistId} + '/movies/' + ${c.tmdbId()} + '/move'"
+                hx-vals='{"dir": "up"}'
+                hx-swap="none">‹</button>
+        <button type="button" class="card-move-btn" data-move="down" aria-label="Move later in the playlist"
+                th:attr="hx-post='/playlists/' + ${playlistId} + '/movies/' + ${c.tmdbId()} + '/move'"
+                hx-vals='{"dir": "down"}'
+                hx-swap="none">›</button>
+    </div>
     <a class="card-link" th:href="'/movies/' + ${c.tmdbId()}">
         <span class="card-poster">
             <img th:if="${c.posterUrl() != null}" th:src="${c.posterUrl()}" alt="" loading="lazy">

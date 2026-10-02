@@ -548,6 +548,16 @@ function shareUrl() {
         if (print) {
             window.print();
         }
+        // playlists page: the New button reveals the name row above the list
+        var newPlaylist = event.target.closest('[data-new-playlist]');
+        if (newPlaylist) {
+            var newForm = document.querySelector('[data-new-playlist-form]');
+            if (newForm) {
+                newForm.hidden = false;
+                var newInput = newForm.querySelector('input');
+                newInput.focus();
+            }
+        }
         // playlist page: the rename form replaces the title in place until
         // saved or cancelled — the heading hides so the form takes its slot
         var renameToggle = event.target.closest('[data-rename-toggle]');
@@ -562,6 +572,23 @@ function shareUrl() {
                 var renameInput = form.querySelector('input');
                 renameInput.focus();
                 renameInput.select();
+            }
+            return;
+        }
+        // playlist page: Reorder reveals the per-card move arrows until
+        // toggled off — the same button becomes Done while the mode is on
+        var reorderToggle = event.target.closest('[data-reorder-toggle]');
+        if (reorderToggle) {
+            var reorderSection = reorderToggle.closest('.marked-list');
+            if (reorderSection) {
+                var reordering = !reorderSection.hasAttribute('data-reordering');
+                if (reordering) {
+                    reorderSection.setAttribute('data-reordering', '');
+                    reorderToggle.textContent = 'Done';
+                } else {
+                    reorderSection.removeAttribute('data-reordering');
+                    reorderToggle.textContent = 'Reorder';
+                }
             }
         }
     });
@@ -579,6 +606,17 @@ function shareUrl() {
             }
             return;
         }
+        var newPlaylistForm = event.target.closest('[data-new-playlist-form]');
+        if (newPlaylistForm) {
+            if (event.key === 'Escape') {
+                newPlaylistForm.hidden = true;
+                var newPlaylistButton = document.querySelector('[data-new-playlist]');
+                if (newPlaylistButton) {
+                    newPlaylistButton.focus();
+                }
+            }
+            return;
+        }
         var renameForm = event.target.closest('[data-rename-form]');
         if (renameForm) {
             if (event.key === 'Escape') {
@@ -591,6 +629,17 @@ function shareUrl() {
                         renameToggle.focus();
                     }
                 }
+            }
+            return;
+        }
+        // Escape also exits reorder mode, like the other inline modes
+        var reorderSection = document.querySelector('[data-reordering]');
+        if (reorderSection && event.key === 'Escape') {
+            reorderSection.removeAttribute('data-reordering');
+            var reorderToggle = document.querySelector('[data-reorder-toggle]');
+            if (reorderToggle) {
+                reorderToggle.textContent = 'Reorder';
+                reorderToggle.focus();
             }
             return;
         }
@@ -614,6 +663,50 @@ function shareUrl() {
             commitNameEdit(false);
         }
     });
+
+    // playlist reorder: the move button's POST swaps positions on the server
+    // (wrapping at the edges) and returns an empty body — the DOM mirrors the
+    // move right here so no cards are re-fetched; the share dialog's URL is
+    // rebuilt from the new card order, so the next Share carries it
+    document.addEventListener('htmx:afterRequest', function (event) {
+        var moveButton = event.target.closest('[data-move]');
+        if (!moveButton || !event.detail.successful) {
+            return;
+        }
+        var card = moveButton.closest('.movie-cards li');
+        if (!card || !card.parentNode || card.parentNode.children.length < 2) {
+            return; // a single card has nothing to swap with
+        }
+        var up = moveButton.getAttribute('data-move') === 'up';
+        if (up && card.previousElementSibling) {
+            card.parentNode.insertBefore(card, card.previousElementSibling);
+        } else if (up) {
+            card.parentNode.appendChild(card); // first wraps to the end
+        } else if (card.nextElementSibling) {
+            card.parentNode.insertBefore(card, card.nextElementSibling.nextElementSibling);
+        } else {
+            card.parentNode.insertBefore(card, card.parentNode.firstElementChild); // last wraps to the front
+        }
+        syncReorderedShareUrl();
+    });
+
+    // the playlist page's share URL is the playlist's /list snapshot — its
+    // movie params must follow the live card order
+    function syncReorderedShareUrl() {
+        var holder = document.querySelector('[data-share-url]');
+        if (!holder) {
+            return;
+        }
+        var url = holder.getAttribute('data-share-url') || '/list';
+        var parts = url.split('?');
+        var params = new URLSearchParams(parts[1] || '');
+        params.delete('movie');
+        visibleCardIds().forEach(function (id) {
+            params.append('movie', id);
+        });
+        var query = params.toString();
+        holder.setAttribute('data-share-url', parts[0] + (query ? '?' + query : ''));
+    }
 
     // other tabs: stay in sync with their marks and the list name (anonymous mode
     // only — authenticated marks have no local counterpart to sync)

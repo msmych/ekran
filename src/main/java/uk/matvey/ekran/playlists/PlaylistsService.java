@@ -22,6 +22,11 @@ public class PlaylistsService {
         return name.isEmpty() || name.length() > MAX_NAME ? Optional.empty() : Optional.of(name);
     }
 
+    /** Whether the movie belongs to at least one playlist (drives the Edit/+ Add button label). */
+    public static boolean hasMemberships(List<PlaylistMembership> memberships) {
+        return memberships.stream().anyMatch(PlaylistMembership::member);
+    }
+
     public List<Playlist> playlists(long userId) {
         return repository.playlists(userId);
     }
@@ -60,5 +65,9 @@ public class PlaylistsService {
 
     public void removeMovie(long userId, long playlistId, long movieId) {
         repository.removeMovie(userId, playlistId, movieId);
+    }
+
+    public boolean moveMovie(long userId, long playlistId, long movieId, boolean up) {
+        return repository.moveMovie(userId, playlistId, movieId, up);
     }
 }

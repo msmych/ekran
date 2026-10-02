@@ -6,14 +6,12 @@
      th:fragment="chips(memberships, movieId, oob)"
      th:if="${memberships != null}"
      th:attr="hx-swap-oob=${oob} ? 'true' : null">
-    <span th:each="m : ${memberships}" th:if="${m.member()}" class="playlist-chip on"
-          th:attr="hx-delete='/playlists/' + ${m.id} + '/movies/' + ${movieId}"
-          hx-swap="none"
-          hx-on:htmx:after-request="if (event.detail.successful) this.remove()">
-        <span th:text="${m.name}">Favorites</span>
-        <span class="chip-x" aria-hidden="true">✕</span>
-    </span>
+    <!-- chips are markers, not controls: membership changes happen only in the dialog -->
+    <a th:each="m : ${memberships}" th:if="${m.member()}" class="playlist-chip on"
+       th:href="'/playlists/' + ${m.id}"
+       th:text="${m.name}">Favorites</a>
     <button type="button" class="playlist-chip add-chip" data-dialog="playlist-select"
+            th:text="${hasMembers} ? 'Edit' : '+ Add'"
             th:attr="hx-get='/playlists/select?movie=' + ${movieId}"
             hx-target="#playlist-select-body"
             hx-swap="innerHTML">+ Add</button>

@@ -17,6 +17,7 @@ import uk.matvey.ekran.marks.MarksService;
 import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.auth.CapturingEmailService.SentEmail;
+import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.service.PersonService;
@@ -32,6 +33,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthRoutesTest {
 
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("token=([A-Za-z0-9_-]{43})");
+
+    private static final Movie GODFATHER_MOVIE = new Movie(
+        238, "The Godfather", null, null, null, List.of(), null, null, null, null,
+        List.of(), List.of(), List.of(), null, List.of());
+
+    private static final Movie PULP_MOVIE = new Movie(
+        680, "Pulp Fiction", null, null, null, List.of(), null, null, null, null,
+        List.of(), List.of(), List.of(), null, List.of());
 
     // redirect assertions need the raw 3xx — the default client follows them
     private static final OkHttpClient NO_REDIRECTS = new OkHttpClient.Builder()
@@ -396,9 +405,14 @@ class AuthRoutesTest {
             assertThat(add.code()).isEqualTo(200);
             var addBody = add.body().string();
             assertThat(addBody).contains("Sci-fi");
+            // the dialog pick button still toggles membership
             assertThat(addBody).contains("hx-delete=\"/playlists/" + playlistId + "/movies/238\"");
-            // out-of-band chips refresh for the movie page
+            // out-of-band chips refresh for the movie page:
+            // the chip is a marker link now, and the button flips to Edit
             assertThat(addBody).contains("hx-swap-oob=\"true\"");
+            assertThat(addBody).contains("class=\"playlist-chip on\"");
+            assertThat(addBody).contains("href=\"/playlists/" + playlistId + "\">Sci-fi</a>");
+            assertThat(addBody).contains(">Edit</button>");
 
             var detail = http.get("/playlists/" + playlistId, r -> r.header("Cookie", cookie(sessionId)));
             var detailBody = detail.body().string();
@@ -420,7 +434,10 @@ class AuthRoutesTest {
                 r.method("DELETE", null);
             });
             assertThat(remove.code()).isEqualTo(200);
-            assertThat(remove.body().string()).contains("hx-post=\"/playlists/" + playlistId + "/movies/238\"");
+            var removeBody = remove.body().string();
+            assertThat(removeBody).contains("hx-post=\"/playlists/" + playlistId + "/movies/238\"");
+            // with no memberships left, the chips button reverts to + Add
+            assertThat(removeBody).contains("+ Add");
 
             // delete
             var delete = http.request("/playlists/" + playlistId + "/delete", r -> {
@@ -496,6 +513,10 @@ class AuthRoutesTest {
                 r.header("Cookie", cookie(bob));
                 r.post(new FormBody.Builder().add("name", "Bob's").build());
             }).code()).isEqualTo(404);
+            assertThat(http.request("/playlists/" + playlistId + "/movies/680/move", r -> {
+                r.header("Cookie", cookie(bob));
+                r.post(new FormBody.Builder().add("dir", "up").build());
+            }).code()).isEqualTo(404);
 
             // alice's data is untouched
             assertThat(http.get("/playlists/" + playlistId, r -> r.header("Cookie", cookie(alice)))
@@ -503,13 +524,94 @@ class AuthRoutesTest {
         });
     }
 
-    @Test
-    void playlistEndpointsRejectAnonymous() {
+@Test
+void playlistMovieMoveSwapsAndWraps() {
+    authTest((server, http) -> {
+        var sessionId = signIn(http, "orderer@bar.com");
+        var create = namedCreate(http, sessionId, "Marathon");
+        var playlistId = create.header("Location").substring("/playlists/".length());
+        // bulk add preserves the form order: 238, then 680
+        http.request("/playlists/" + playlistId + "/movies", r -> {
+            r.header("Cookie", cookie(sessionId));
+            r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
+        });
+
+        // the share URL mirrors the playlist order — move 680 up and it leads
+        assertThat(move(http, sessionId, playlistId, 680, "up").code()).isEqualTo(200);
+        assertThat(shareUrlOf(http, sessionId, playlistId)).contains("movie=680&amp;movie=238");
+
+        // first moves up → wraps to the end
+        assertThat(move(http, sessionId, playlistId, 680, "up").code()).isEqualTo(200);
+        assertThat(shareUrlOf(http, sessionId, playlistId)).contains("movie=238&amp;movie=680");
+
+        // last moves down → wraps to the front
+        assertThat(move(http, sessionId, playlistId, 680, "down").code()).isEqualTo(200);
+        assertThat(shareUrlOf(http, sessionId, playlistId)).contains("movie=680&amp;movie=238");
+
+        // unknown movies are accepted no-ops, bad input is rejected
+        assertThat(move(http, sessionId, playlistId, 999, "up").code()).isEqualTo(200);
+        assertThat(shareUrlOf(http, sessionId, playlistId)).contains("movie=680&amp;movie=238");
+        assertThat(move(http, sessionId, playlistId, 680, "sideways").code()).isEqualTo(400);
+        assertThat(http.request("/playlists/" + playlistId + "/movies/abc/move", r -> {
+            r.header("Cookie", cookie(sessionId));
+            r.post(new FormBody.Builder().add("dir", "up").build());
+        }).code()).isEqualTo(400);
+    });
+}
+
+@Test
+void playlistDetailRendersReorderControls() {
+    // cards need real movie data — this test gets its own app with stubs
+    var app = EkranApp.create(
+        new SearchService((q, p, t) -> new SearchResultPage(List.of())),
+        new MovieService(id -> id == 238
+            ? java.util.Optional.of(GODFATHER_MOVIE)
+            : id == 680 ? java.util.Optional.of(PULP_MOVIE) : java.util.Optional.empty()),
+        new PersonService(id -> java.util.Optional.empty()),
+        authService,
+        new MarksService(new InMemoryMarksRepository()),
+        new PlaylistsService(new InMemoryPlaylistsRepository()),
+        true,
+        null);
+    JavalinTest.test(app, new TestConfig(false, false, NO_REDIRECTS), (server, http) -> {
+        var sessionId = signIn(http, "reorder-viewer@bar.com");
+        var create = namedCreate(http, sessionId, "Watch order");
+        var playlistId = create.header("Location").substring("/playlists/".length());
+        http.request("/playlists/" + playlistId + "/movies", r -> {
+            r.header("Cookie", cookie(sessionId));
+            r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
+        });
+
+        var detail = http.get("/playlists/" + playlistId, r -> r.header("Cookie", cookie(sessionId)));
+        var body = detail.body().string();
+        // the Reorder toggle and per-card move arrows, wired to the move route
+        assertThat(body).contains("data-reorder-toggle");
+        assertThat(body).contains(">Reorder</button>");
+        assertThat(body).contains("class=\"card-move\"");
+        assertThat(body).contains("hx-post=\"/playlists/" + playlistId + "/movies/238/move\"");
+        assertThat(body).contains("data-move=\"up\"");
+        assertThat(body).contains("data-move=\"down\"");
+        // cards render in playlist order
+        assertThat(body.indexOf("data-movie-id=\"238\"")).isLessThan(body.indexOf("data-movie-id=\"680\""));
+
+        // the server-side swap shows up in a plain re-render — no JS involved
+        assertThat(move(http, sessionId, playlistId, 680, "up").code()).isEqualTo(200);
+        var reordered = http.get("/playlists/" + playlistId, r -> r.header("Cookie", cookie(sessionId))).body().string();
+        assertThat(reordered.indexOf("data-movie-id=\"680\"")).isLessThan(reordered.indexOf("data-movie-id=\"238\""));
+
+        // other card surfaces (search, /list, /marked, person pages) never get the controls
+        assertThat(http.get("/list?movie=238&movie=680").body().string()).doesNotContain("card-move");
+    });
+}
+
+@Test
+void playlistEndpointsRejectAnonymous() {
         authTest((server, http) -> {
             assertThat(postForm(http, "/playlists", "name", "Nope").code()).isEqualTo(401);
             assertThat(http.get("/playlists/select?movie=238").code()).isEqualTo(401);
             assertThat(http.request("/playlists/1/movies/238", r -> r.post(noBody())).code()).isEqualTo(401);
             assertThat(http.request("/playlists/1/movies/238", r -> r.method("DELETE", null)).code()).isEqualTo(401);
+            assertThat(http.request("/playlists/1/movies/238/move", r -> r.post(noBody())).code()).isEqualTo(401);
         });
     }
 
@@ -618,6 +720,21 @@ class AuthRoutesTest {
 
     private static okhttp3.RequestBody noBody() {
         return okhttp3.RequestBody.create(new byte[0], null);
+    }
+
+    private static Response move(io.javalin.testtools.HttpClient http, String sessionId,
+                                 String playlistId, long movieId, String dir) {
+        return http.request("/playlists/" + playlistId + "/movies/" + movieId + "/move", r -> {
+            r.header("Cookie", cookie(sessionId));
+            r.post(new FormBody.Builder().add("dir", dir).build());
+        });
+    }
+
+    private static String shareUrlOf(io.javalin.testtools.HttpClient http, String sessionId,
+                                    String playlistId) throws java.io.IOException {
+        var body = http.get("/playlists/" + playlistId, r -> r.header("Cookie", cookie(sessionId))).body().string();
+        var start = body.indexOf("data-share-url=\"");
+        return start < 0 ? "" : body.substring(start, start + 200);
     }
 
     private static String cookie(String sessionId) {

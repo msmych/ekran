@@ -17,9 +17,6 @@
                     <span th:if="${vm.rating() != null}" th:text="${vm.rating()}">7.8 ★</span>
                     <span th:if="${vm.genres() != null}" th:text="${vm.genres()}">Genres</span>
                 </p>
-                <p class="external-links">
-                    <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
-                </p>
                 <div class="actions-row">
                     <a class="trailers-button"
                        th:if="${!vm.videos().isEmpty()}"
@@ -72,6 +69,10 @@
                 </ul>
             </div>
         </section>
+        <!-- the external link lives at the bottom, out of the busy head -->
+        <p class="external-links">
+            <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
+        </p>
         <dialog id="trailers" th:if="${!vm.videos().isEmpty()}">
             <div class="dialog-head">
                 <h2>Trailers</h2>

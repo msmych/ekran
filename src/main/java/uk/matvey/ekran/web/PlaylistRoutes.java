@@ -43,6 +43,7 @@ public class PlaylistRoutes {
         app.post("/playlists/{id}/movies", this::addMovies);
         app.post("/playlists/{id}/movies/{movieId}", this::addMovie);
         app.delete("/playlists/{id}/movies/{movieId}", this::removeMovie);
+        app.post("/playlists/{id}/movies/{movieId}/move", this::moveMovie);
     }
 
     private void index(Context ctx) {
@@ -87,11 +88,7 @@ public class PlaylistRoutes {
             return;
         }
         if (ids.size() == 1) {
-            var memberships = playlistsService.playlistsWithMovie(userId, ids.getFirst());
-            ctx.render("playlist-select", Map.of(
-                "memberships", memberships,
-                "movieId", ids.getFirst(),
-                "movieIds", List.of(ids.getFirst())));
+            ctx.render("playlist-select", singleMovieSelect(userId, ids.getFirst()));
         } else {
             var memberships = playlistsService.playlists(userId).stream()
                 .map(p -> new PlaylistMembership(p.id(), p.name(), false))
@@ -126,10 +123,7 @@ public class PlaylistRoutes {
         clearMarkedIfRequested(ctx, userId, movieIds);
         if (movieIds.size() == 1) {
             // movie-page dialog: stay in the dialog, show the new playlist checked
-            ctx.render("playlist-select", Map.of(
-                "memberships", playlistsService.playlistsWithMovie(userId, movieIds.getFirst()),
-                "movieId", movieIds.getFirst(),
-                "movieIds", List.of(movieIds.getFirst())));
+            ctx.render("playlist-select", singleMovieSelect(userId, movieIds.getFirst()));
             return;
         }
         navigate(ctx, "/playlists/" + id);
@@ -185,6 +179,29 @@ public class PlaylistRoutes {
         mutateMembership(ctx, playlistsService::removeMovie);
     }
 
+    // reorder mode: the button posts here, the server swaps the position
+    // (wrapping at the edges); the response is empty — the client mirrors
+    // the move in the DOM, no re-render needed
+    private void moveMovie(Context ctx) {
+        var userId = userId(ctx);
+        if (userId == null) {
+            ctx.status(401);
+            return;
+        }
+        var id = parseId(ctx);
+        var rawMovieId = ctx.pathParam("movieId");
+        if (!MovieIds.isValid(rawMovieId)) {
+            ctx.status(400);
+            return;
+        }
+        var dir = ctx.formParam("dir");
+        if (!"up".equals(dir) && !"down".equals(dir)) {
+            ctx.status(400);
+            return;
+        }
+        playlistsService.moveMovie(userId, id, Long.parseLong(rawMovieId), "up".equals(dir));
+    }
+
     private void mutateMembership(Context ctx, MembershipOperation operation) {
         var userId = userId(ctx);
         if (userId == null) {
@@ -200,10 +217,19 @@ public class PlaylistRoutes {
         var movieId = Long.parseLong(rawMovieId);
         operation.apply(userId, id, movieId);
         // the dialog refreshes itself; the chips div travels out-of-band
-        ctx.render("playlist-select", Map.of(
-            "memberships", playlistsService.playlistsWithMovie(userId, movieId),
+        ctx.render("playlist-select", singleMovieSelect(userId, movieId));
+    }
+
+    // the single-movie (movie-page) dialog model, shared by open, create and
+    // membership mutations: memberships with their member flags drive both the
+    // picker list and the out-of-band chips row, hasMembers flips its button
+    private Map<String, Object> singleMovieSelect(long userId, long movieId) {
+        var memberships = playlistsService.playlistsWithMovie(userId, movieId);
+        return Map.of(
+            "memberships", memberships,
+            "hasMembers", PlaylistsService.hasMemberships(memberships),
             "movieId", movieId,
-            "movieIds", List.of(movieId)));
+            "movieIds", List.of(movieId));
     }
 
     // the /marked dialog sends clearMarked=true: composing a playlist out of
