@@ -593,6 +593,20 @@
         }
     }
 
+    // playlists page + picker dialog: fold the create form away, bring the
+    // New button back (its focus — the flow continues from there)
+    function closeNewPlaylistForm() {
+        var newForm = document.querySelector('[data-new-playlist-form]');
+        if (newForm) {
+            newForm.hidden = true;
+        }
+        var newPlaylistButton = document.querySelector('[data-new-playlist]');
+        if (newPlaylistButton) {
+            newPlaylistButton.hidden = false;
+            newPlaylistButton.focus();
+        }
+    }
+
     function syncListUrl() {
         if (!LIST_PAGE) {
             return;
@@ -910,15 +924,23 @@
         if (print) {
             window.print();
         }
-        // playlists page: the New button reveals the name row above the list
+        // playlists page + the picker dialog: the New button reveals the create
+        // form and hides itself — Cancel/Escape brings it back
         var newPlaylist = event.target.closest('[data-new-playlist]');
         if (newPlaylist) {
             var newForm = document.querySelector('[data-new-playlist-form]');
             if (newForm) {
+                newPlaylist.hidden = true;
                 newForm.hidden = false;
                 var newInput = newForm.querySelector('input');
                 newInput.focus();
             }
+            return;
+        }
+        var newPlaylistCancel = event.target.closest('[data-new-playlist-cancel]');
+        if (newPlaylistCancel) {
+            closeNewPlaylistForm();
+            return;
         }
         // playlist page: the rename form replaces the title in place until
         // saved or cancelled — the heading hides so the form takes its slot
@@ -1005,11 +1027,7 @@
         var newPlaylistForm = event.target.closest('[data-new-playlist-form]');
         if (newPlaylistForm) {
             if (event.key === 'Escape') {
-                newPlaylistForm.hidden = true;
-                var newPlaylistButton = document.querySelector('[data-new-playlist]');
-                if (newPlaylistButton) {
-                    newPlaylistButton.focus();
-                }
+                closeNewPlaylistForm();
             }
             return;
         }
@@ -1204,6 +1222,24 @@
         refresh();
         applyCardsView();
         movieNoteAffordance();
+        // move-all from the marked page: the server has already cleared the
+        // marks (the header seed is stale until the next request) — the moved
+        // ids ride on the confirmation, the cards and counts follow here
+        var moved = document.querySelector('.pick-confirmation[data-moved-movies]');
+        if (moved) {
+            var movedIds = (moved.getAttribute('data-moved-movies') || '')
+                .split(',').filter(Boolean).map(Number);
+            ids = ids.filter(function (id) {
+                return movedIds.indexOf(id) === -1;
+            });
+            movedIds.forEach(function (id) {
+                var li = document.querySelector('.movie-cards li[data-movie-id="' + id + '"]');
+                if (li) {
+                    li.remove();
+                }
+            });
+            refresh();
+        }
         // a note editor swapped in takes focus straight away — clicking the
         // toggle already said "edit now" (the local anonymous editor does
         // the same in openLocalNoteEditor)

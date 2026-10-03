@@ -219,10 +219,11 @@ Signed-in users can also group movies into **playlists** (`playlists` + `playlis
 in PostgreSQL, ordered by insert position): the `Add to playlist` dialog on movie pages
 and lists lets them create playlists, toggle membership, or bulk-add the whole shared
 list. Playlists are ownership-scoped (another user's playlist behaves as 404); membership
-is independent of marks — composing a playlist from your marks **copies** (the marks and
-their notes stay; each new membership inherits the mark's note). A playlist can carry an
-optional description (≤1000 chars), and each membership an optional per-playlist note —
-both edited in place. A playlist's Share link is just `/list?movie=…&name=…`, so it
+is independent of marks — the marked page's **Move all to playlist** *moves*: each new
+membership inherits the mark's note, then the marks clear (marks are the staging inbox,
+playlists the destination); the movie-page dialog and shared lists stay a copy. A
+playlist can carry an optional description (≤1000 chars), and each membership an
+optional per-playlist note — both edited in place. A playlist's Share link is just `/list?movie=…&name=…`, so it
 renders for anyone, no account needed.
 
 ## Project layout

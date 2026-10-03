@@ -6,6 +6,7 @@ import io.javalin.http.Context;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
@@ -89,7 +90,9 @@ public class PlaylistRoutes extends Routes {
     }
 
     // dialog body: exactly one movie param → toggle-membership mode (movie page);
-    // several → pick-a-playlist bulk mode (shared lists, marked page)
+    // several → pick-a-playlist bulk mode (shared lists, marked page). The marked
+    // page asks for move-all semantics (move=true): even a single movie stays in
+    // bulk mode there, so every dialog action carries the move
     private void select(Context ctx) {
         var userId = requireUser(ctx);
         var ids = MovieIds.validOf(ctx.queryParams("movie"));
@@ -97,15 +100,18 @@ public class PlaylistRoutes extends Routes {
             ctx.status(400);
             return;
         }
-        if (ids.size() == 1) {
+        var move = isMove(ctx);
+        if (ids.size() == 1 && !move) {
             ctx.render("playlist-select", singleMovieSelect(userId, ids.getFirst()));
         } else {
-            ctx.render("playlist-select", bulkSelect(userId, ids, null, null));
+            ctx.render("playlist-select", bulkSelect(userId, ids, null, null, move));
         }
     }
 
-    // composing a playlist out of marked movies is a copy, not a move: the
-    // marks stay, and each mark's note is carried into the new membership
+    // composing a playlist out of marked movies is a move: each membership
+    // inherits the mark's note first, then the marks are cleared — marks are
+    // the staging inbox, playlists the curated destination; from shared
+    // lists (no move flag) it stays a copy
     private void create(Context ctx) {
         var userId = requireUser(ctx);
         var name = PlaylistsService.validName(ctx.formParam("name"));
@@ -119,18 +125,22 @@ public class PlaylistRoutes extends Routes {
             return;
         }
         var movieIds = MovieIds.validOf(ctx.formParams("movie"));
+        var move = isMove(ctx);
         // one transaction: the playlist is created with its movies or not at all
         var id = playlistsService.createPlaylist(userId, name.get(), description, withMarkNotes(userId, movieIds));
-        if (movieIds.size() == 1) {
+        if (move) {
+            marksService.unmarkAll(userId, movieIds);
+        }
+        if (movieIds.size() == 1 && !move) {
             // movie-page dialog: stay in the dialog, show the new playlist checked
             ctx.render("playlist-select", singleMovieSelect(userId, movieIds.getFirst()));
             return;
         }
-        if (movieIds.size() > 1 && htmx(ctx)) {
+        if (!movieIds.isEmpty() && htmx(ctx)) {
             // bulk dialog: stay on the page the dialog was opened from, with a
             // confirmation — the picker keeps its movie set, so more adds work
-            ctx.render("playlist-select", bulkSelect(userId, movieIds,
-                "Created " + name.get() + " with " + movieIds.size() + " movies", "/playlists/" + id));
+            ctx.render("playlist-select", bulkSelect(userId, movieIds, createdMessage(name.get(), movieIds, move),
+                "/playlists/" + id, move));
             return;
         }
         navigate(ctx, "/playlists/" + id);
@@ -175,14 +185,20 @@ public class PlaylistRoutes extends Routes {
         var userId = requireUser(ctx);
         var id = parseId(ctx);
         var movieIds = MovieIds.validOf(ctx.formParams("movie"));
+        var move = isMove(ctx);
         playlistsService.addMovies(userId, id, withMarkNotes(userId, movieIds));
+        if (move) {
+            marksService.unmarkAll(userId, movieIds);
+        }
         if (htmx(ctx)) {
             // bulk dialog: stay on the page, confirm in the picker
             var name = playlistsService.playlist(userId, id)
                 .map(PlaylistDetail::name)
                 .orElse("");
-            ctx.render("playlist-select", bulkSelect(userId, movieIds,
-                "Added " + movieIds.size() + " movies to " + name, "/playlists/" + id));
+            var message = move
+                ? "Moved " + movieIds.size() + " movies to " + name
+                : "Added " + movieIds.size() + " movies to " + name;
+            ctx.render("playlist-select", bulkSelect(userId, movieIds, message, "/playlists/" + id, move));
             return;
         }
         navigate(ctx, "/playlists/" + id);
@@ -286,8 +302,10 @@ public class PlaylistRoutes extends Routes {
     }
 
     // the bulk (shared lists, marked page) dialog model: one pick button per
-    // playlist, the movie set kept as hidden inputs so further adds carry it
-    private Map<String, Object> bulkSelect(long userId, List<Long> movieIds, String confirmation, String playlistUrl) {
+    // playlist, the movie set kept as hidden inputs so further adds carry it;
+    // move-all responses confirm with the moved ids, so the origin page can
+    // clear its cards and counts
+    private Map<String, Object> bulkSelect(long userId, List<Long> movieIds, String confirmation, String playlistUrl, boolean move) {
         var memberships = playlistsService.playlists(userId).stream()
             .map(p -> new PlaylistMembership(p.id(), p.name(), false, null))
             .toList();
@@ -297,11 +315,24 @@ public class PlaylistRoutes extends Routes {
         model.put("movieIds", movieIds);
         model.put("confirmation", confirmation);
         model.put("playlistUrl", playlistUrl);
+        model.put("move", move);
+        model.put("movedMovieIds", move ? movieIds.stream().map(String::valueOf).collect(Collectors.joining(",")) : null);
         return model;
     }
 
-    // new memberships carry the movie's mark note, where one exists; the marks
-    // themselves are never touched
+    // move-all only from the marked page; anything else (movie page, shared
+    // lists) is a copy — marks there are not the user's staging set
+    private static boolean isMove(Context ctx) {
+        return "true".equals(ctx.formParam("move")) || "true".equals(ctx.queryParam("move"));
+    }
+
+    private static String createdMessage(String name, List<Long> movieIds, boolean move) {
+        var movies = movieIds.size() == 1 ? " movie" : " movies";
+        return "Created " + name + " with " + movieIds.size() + movies + (move ? " — marks cleared" : "");
+    }
+
+    // new memberships carry the movie's mark note; with move-all the marks are
+    // cleared right after — the notes live on in the memberships
     private List<MovieNote> withMarkNotes(long userId, List<Long> movieIds) {
         var markNotes = new HashMap<Long, String>();
         marksService.markedMovies(userId).forEach(m -> {

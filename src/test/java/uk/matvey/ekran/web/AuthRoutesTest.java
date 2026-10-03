@@ -678,7 +678,7 @@ void playlistEndpointsRejectAnonymous() {
     }
 
 @Test
-void playlistDialogFromMarkedCopiesMarksAndNotes() {
+    void playlistDialogWithoutMoveKeepsMarksAndNotes() {
         authTest((server, http) -> {
             var sessionId = signIn(http, "composer@bar.com");
             http.request("/marked", r -> {
@@ -690,9 +690,9 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
                 r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
             });
 
-            // composing a playlist out of the marks is a copy, not a move:
-            // the marks stay and each mark's note carries into the membership;
-            // the dialog stays on the marked page with a confirmation
+            // no move flag (shared lists, plain dialog posts): a copy — the
+            // marks stay and each mark's note carries into the membership;
+            // the dialog stays on the page with a confirmation
             var create = http.request("/playlists", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.header("HX-Request", "true");
@@ -730,6 +730,76 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
         return http.request("/playlists", r -> {
             r.header("Cookie", cookie(sessionId));
             r.post(new FormBody.Builder().add("name", name).build());
+        });
+    }
+
+    @Test
+    void playlistDialogFromMarkedMovesMarksIntoThePlaylist() {
+        authTest((server, http) -> {
+            var sessionId = signIn(http, "mover@bar.com");
+            http.request("/marked", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
+            });
+            http.request("/marked/238/note", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
+            });
+
+            // the marked page's dialog: bulk move mode, the movie set and the
+            // move flag riding along on every action; the create form must
+            // include the movie set (regression: a bare `closest` pointed at a
+            // sibling and created an empty playlist)
+            var select = http.get("/playlists/select?movie=238&movie=680&move=true",
+                r -> r.header("Cookie", cookie(sessionId))).body().string();
+            assertThat(select).contains("Move 2 movies to…");
+            assertThat(select).contains("name=\"move\"");
+            assertThat(select).contains("hx-include=\"closest .playlist-select find .dialog-movies\"");
+
+            var create = http.request("/playlists", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.header("HX-Request", "true");
+                r.post(new FormBody.Builder()
+                    .add("name", "Watched in 2026")
+                    .add("movie", "238")
+                    .add("movie", "680")
+                    .add("move", "true")
+                    .build());
+            });
+            var createBody = create.body().string();
+            assertThat(create.header("HX-Redirect")).isNull();
+            assertThat(createBody).contains("Created Watched in 2026 with 2 movies — marks cleared");
+            // the confirmation carries the moved ids so the page clears its cards
+            assertThat(createBody).contains("data-moved-movies=\"238,680\"");
+            assertThat(idsOf(http, sessionId)).isEmpty();
+            var playlistId = playlistIdFromDialog(http, sessionId);
+            // the membership inherited the mark note before the mark went
+            assertThat(http.get("/playlists/" + playlistId + "/movies/238/note",
+                r -> r.header("Cookie", cookie(sessionId))).body().string())
+                .contains("diner scene is perfect");
+
+            // moving into an existing playlist works the same
+            http.request("/marked", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
+            });
+            var add = http.request("/playlists/" + playlistId + "/movies", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.header("HX-Request", "true");
+                r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").add("move", "true").build());
+            });
+            assertThat(add.body().string()).contains("Moved 2 movies to Watched in 2026");
+            assertThat(idsOf(http, sessionId)).isEmpty();
+
+            // a single marked movie still gets the bulk move dialog
+            http.request("/marked", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("movie", "238").build());
+            });
+            var single = http.get("/playlists/select?movie=238&move=true",
+                r -> r.header("Cookie", cookie(sessionId))).body().string();
+            assertThat(single).contains("Move 1 movie to…");
+            assertThat(single).contains("name=\"move\"");
         });
     }
 

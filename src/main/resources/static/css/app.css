@@ -123,12 +123,14 @@ body {
     display: block;
 }
 
-/* shared outline-icon base (bookmark toggles, list-name pencil, note toggles);
-   the filled state (…marked svg path below) flips fill/stroke */
+/* shared outline-icon base (bookmark toggles, list-name pencil, note
+   toggles, picker check); the filled state (…marked svg path below) flips
+   fill/stroke */
 .card-mark svg path,
 .mark-toggle svg path,
 .card-note-toggle svg path,
-.list-name-edit svg path {
+.list-name-edit svg path,
+.pick-mark svg path {
     fill: none;
     stroke: currentColor;
     stroke-width: 1.4;
@@ -1399,6 +1401,10 @@ kbd {
     color: var(--accent);
 }
 
+.playlist-picker .pick-mark svg {
+    display: block;
+}
+
 .playlist-picker .pick-empty {
     font-size: 13px;
     color: var(--muted);
@@ -1421,22 +1427,31 @@ kbd {
     flex: none;
 }
 
-/* the create form in the dialog: column layout so the optional description
-   gets its own line */
+/* the create form in the dialog hides behind the New playlist chip; the
+   inputs size to their content, not the dialog width */
+.playlist-select .pick-new-toggle {
+    padding: 0 16px 12px;
+}
+
 .playlist-select .pick-new {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 8px;
     padding: 0 16px 16px;
 }
 
 .playlist-select .pick-new input[type="text"] {
-    flex: 1;
+    width: min(320px, 100%);
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 14px;
+}
+
+.playlist-select .pick-new-actions {
+    display: flex;
+    gap: 8px;
 }
 
 /* playlist index */

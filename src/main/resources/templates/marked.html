@@ -14,9 +14,9 @@
                 <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
                 <button type="button" class="chip-button" th:if="${!cards.isEmpty()}"
                         data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
+                        th:attr="hx-get=@{/playlists/select(movie=${movieIds}, move=true)}"
                         hx-target="#playlist-select-body"
-                        hx-swap="innerHTML">Add all to playlist</button>
+                        hx-swap="innerHTML">Move all to playlist</button>
                 <button type="button" class="chip-button" data-clear-marks th:hidden="${cards.isEmpty()}">Clear all</button>
                 <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
             </div>
