@@ -123,10 +123,11 @@ body {
     display: block;
 }
 
-/* shared outline-icon base (bookmark toggles, list-name pencil); the filled
-   state (…marked svg path below) flips fill/stroke */
+/* shared outline-icon base (bookmark toggles, list-name pencil, note toggles);
+   the filled state (…marked svg path below) flips fill/stroke */
 .card-mark svg path,
 .mark-toggle svg path,
+.card-note-toggle svg path,
 .list-name-edit svg path {
     fill: none;
     stroke: currentColor;
@@ -143,7 +144,7 @@ body {
     color: var(--accent);
 }
 
-/* the filled bookmark, wherever the toggle lives */
+/* filled icon state: the marked bookmark (the note page stays outlined) */
 .card-mark.marked svg path,
 .mark-toggle.marked svg path {
     fill: currentColor;
@@ -584,8 +585,8 @@ body {
     margin: 12px 0 0;
 }
 
-/* sits inline with the trailers chip in the actions row; padding gives the
-   icon-only control a usable tap target without adding visual weight */
+/* the icon-only mark control; padding gives it a usable tap target
+   without adding visual weight */
 .mark-toggle {
     display: inline-flex;
     align-items: center;
@@ -894,6 +895,53 @@ html:has(dialog[open]) body {
     min-width: 0;
 }
 
+/* grid view (default): the details row is a grid — info left, bookmark
+   top-right, the note (or editor mid-swap) spanning a full row below;
+   the page icon itself pins into the right column at a fixed offset
+   from the row top, right under the bookmark — noted or not — so it
+   never dangles in a row of its own */
+.movie-cards:not([data-view="rows"]) .card-details {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "info mark"
+        "note note";
+    align-items: start;
+    gap: 0 2px;
+}
+
+.movie-cards:not([data-view="rows"]) .card-info-link {
+    grid-area: info;
+}
+
+.movie-cards:not([data-view="rows"]) .card-mark {
+    grid-area: mark;
+}
+
+.movie-cards:not([data-view="rows"]) .card-note {
+    grid-area: note;
+}
+
+/* the mark anchors to the row's top whatever the title wraps to, so the
+   offset below it is constant */
+.movie-cards:not([data-view="rows"]) .card-note-toggle {
+    position: absolute;
+    top: 17px;
+    right: 0;
+    margin: 0;
+}
+
+/* a present note keeps clear of the pinned icon */
+.movie-cards:not([data-view="rows"]) .card-note:has(.card-note-text) {
+    padding-right: 30px;
+}
+
+/* the bare icon state adds no row of its own */
+.movie-cards:not([data-view="rows"]) .card-note:not(:has(.card-note-text)):not(:has(.card-note-form)) {
+    margin: 0;
+}
+
 .card-info {
     display: block;
 }
@@ -956,7 +1004,11 @@ html:has(dialog[open]) body {
     width: 72px;
 }
 
+/* rows view: the note (now inside the details row) wraps onto its own
+   full-width line under the title */
 .movie-cards[data-view="rows"] .card-details {
+    display: flex;
+    flex-wrap: wrap;
     margin-top: 0;
     align-items: center;
 }
@@ -965,7 +1017,8 @@ html:has(dialog[open]) body {
     font-size: 15px;
 }
 
-.movie-cards[data-view="rows"] li > .card-note {
+.movie-cards[data-view="rows"] .card-details .card-note {
+    flex-basis: 100%;
     margin: 2px 0 0;
 }
 
@@ -1185,12 +1238,18 @@ kbd {
         display: block;
     }
 
-    .marked-list .movie-cards li {
-        display: block;
-        padding: 6px 0;
-        border-bottom: 1px solid #ddd;
-        break-inside: avoid;
-    }
+.marked-list .movie-cards li {
+    display: block;
+    padding: 6px 0;
+    border-bottom: 1px solid #ddd;
+    break-inside: avoid;
+}
+
+/* the note lives inside the details row now — plain stacking keeps it
+   below the title in print */
+.marked-list .card-details {
+    display: block;
+}
 
     /* whatever view was active on screen, print gets the same clean rows:
        no poster gutter, no row min-height, no note clamp */
@@ -1239,8 +1298,13 @@ kbd {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* movie page: playlist membership chips under the mark toggle */
+/* movie page: playlist membership chips under the mark toggle and note,
+   with the trailers chip carried below them */
 .movie-playlists-row {
+    margin-top: 10px;
+}
+
+.movie-trailers-row {
     margin-top: 10px;
 }
 
@@ -1434,12 +1498,19 @@ kbd {
 }
 
 /* personal notes: mark notes (marked page, movie page), membership notes
-   (playlist page, picker dialog) — plain text plus a light inline editor */
+   (playlist page, picker dialog) — plain text plus a light inline editor;
+   the row puts the toggle at the end, right under the card's bookmark
+   (the movie page flips it to the front, below the mark toggle) */
 .card-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
     margin-top: 4px;
 }
 
 .card-note-text {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: 12px;
     line-height: 1.45;
@@ -1447,23 +1518,49 @@ kbd {
     overflow-wrap: anywhere;
 }
 
+/* the toggle's text state ("+ note" on the movie page) sets the baseline;
+   the icon variants — the page icon on cards, the pencil on the movie
+   page — get a padded tap target, the negative margins keeping the glyph
+   where the text sits */
 .card-note-toggle {
+    flex: none;
     border: none;
     background: none;
     padding: 0;
-    margin-top: 3px;
+    margin: 0;
     font-size: 12px;
     color: var(--muted);
     cursor: pointer;
 }
 
-.card-note-toggle:hover {
+.card-note-toggle svg {
+    display: block;
+}
+
+/* hover; and a present note on cards — the glyph stays outlined, just
+   accent (the movie-page pencil keeps its muted color) */
+.card-note-toggle:hover,
+.card-note-toggle.has-note:not(.note-pencil) {
     color: var(--accent);
+}
+
+.card-note-toggle:has(svg) {
+    padding: 4px 6px;
+    margin: -2px -6px;
+}
+
+/* cards and the picker: the icon sits right under the bookmark at the
+   title row's right edge — flush with it, hence no negative right margin */
+.movie-cards .card-note-toggle:has(svg),
+.playlist-picker .card-note-toggle:has(svg) {
+    margin-left: auto;
+    margin-right: 0;
 }
 
 .card-note-form {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 4px;
 }
 
@@ -1501,10 +1598,22 @@ kbd {
     color: var(--accent);
 }
 
-/* movie page: the mark's note block under the actions row */
+/* movie page: the mark's note block under the mark toggle */
 .movie-note {
     margin-top: 8px;
     max-width: 480px;
+}
+
+/* movie page: the affordance leads the row, right under the mark toggle —
+   plain "+ note" while empty, the pencil beside a saved note */
+.movie-note .card-note-toggle {
+    order: -1;
+}
+
+/* the pencil aligns with the bookmark icon above it (the mark toggle's
+   8px leading padding) */
+.movie-note .card-note-toggle:has(svg) {
+    margin-left: 2px;
 }
 
 /* the slot always renders so a fresh mark can drop the note fragment in;
@@ -1530,10 +1639,6 @@ kbd {
 
 .playlist-picker .pick-note .card-note {
     margin: 0;
-}
-
-.playlist-picker .pick-note .card-note-toggle {
-    margin-top: 0;
 }
 
 /* playlist page: the optional description under the title, edited in place

@@ -39,12 +39,14 @@
                 aria-pressed="false">
             <th:block th:replace="~{bookmark-icon :: icon(14)}"></th:block>
         </button>
+        <!-- personal note: mark note (marked page) or membership note (playlist
+             page); lives inside the details row so the grid view can tuck the
+             lone page icon right under the bookmark instead of dangling it in
+             a row of its own; the page maps its context into note/editUrl -->
+        <th:block th:if="${noteEditUrl != null}" th:with="editUrl=${noteEditUrl}">
+            <div th:replace="~{note-area}"></div>
+        </th:block>
     </div>
-    <!-- personal note: mark note (marked page) or membership note (playlist page);
-         the page maps its context into note/editUrl for the shared note-area -->
-    <th:block th:if="${noteEditUrl != null}" th:with="editUrl=${noteEditUrl}">
-        <div th:replace="~{note-area}"></div>
-    </th:block>
 </li>
 </body>
 </html>

@@ -711,7 +711,7 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
                 r -> r.header("Cookie", cookie(sessionId)));
             assertThat(membershipNote.body().string()).contains("diner scene is perfect");
             assertThat(http.get("/playlists/" + playlistId + "/movies/680/note",
-                r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("+ note");
+                r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("aria-label=\"Add note\"");
 
             // bulk-adding to an existing playlist keeps the marks too, and an
             // existing membership keeps its note (no overwrite on re-add)
@@ -768,7 +768,7 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
 
             // editor pair: the display area (cancel target) and the editor form
             assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
-                .body().string()).contains("+ note");
+                .body().string()).contains("aria-label=\"Add note\"");
             var editor = http.get("/marked/238/note/edit", r -> r.header("Cookie", cookie(sessionId)));
             var editorBody = editor.body().string();
             assertThat(editorBody).contains("<textarea");
@@ -795,7 +795,7 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
             });
             assertThat(idsOf(http, sessionId)).isEqualTo("238");
             assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
-                .body().string()).contains("+ note");
+                .body().string()).contains("aria-label=\"Add note\"");
 
             // too long is rejected, the note stays gone
             assertThat(http.request("/marked/238/note", r -> {
@@ -812,7 +812,7 @@ void playlistDialogFromMarkedCopiesMarksAndNotes() {
             unmark(http, sessionId, 238);
             mark(http, sessionId, 238);
             assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
-                .body().string()).contains("+ note");
+                .body().string()).contains("aria-label=\"Add note\"");
 
             // anonymous users get nothing
             assertThat(http.get("/marked/238/note").code()).isEqualTo(401);

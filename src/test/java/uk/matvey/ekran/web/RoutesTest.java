@@ -184,7 +184,7 @@ class RoutesTest {
 
             assertThat(response.code()).isEqualTo(200);
             var body = response.body().string();
-            assertThat(body).contains("quickest movie search");
+            assertThat(body).contains("is a fast movie search app");
             assertThat(body).contains("href=\"https://matvey.uk\"");
             assertThat(body).contains("hx-target=\"#search-overlay\"");
             assertThat(body).contains("not endorsed or certified by TMDB");
@@ -652,7 +652,7 @@ class RoutesTest {
     }
 
     @Test
-    void moviePageShowsMarkToggleBelowTrailers() {
+    void moviePageShowsTrailersBelowPlaylists() {
         JavalinTest.test(app(), (server, http) -> {
             var response = http.get("/movies/348");
 
@@ -664,7 +664,11 @@ class RoutesTest {
             assertThat(body).contains("data-movie-id=\"348\"");
             assertThat(body).contains("aria-label=\"Mark movie (m)\"");
             assertThat(body).contains("<path d=");
-            assertThat(body.indexOf("trailers-button")).isLessThan(body.indexOf("mark-toggle"));
+            // the actions row is the mark toggle's alone; trailers sits below
+            // the playlist chips, after the mark toggle and its note slot
+            assertThat(body.indexOf("mark-toggle")).isLessThan(body.indexOf("movie-note"));
+            assertThat(body.indexOf("movie-note")).isLessThan(body.indexOf("movie-playlists-row"));
+            assertThat(body.indexOf("movie-playlists-row")).isLessThan(body.indexOf("movie-trailers-row"));
         });
     }
 

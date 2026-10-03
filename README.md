@@ -200,9 +200,13 @@ Movies can be **marked** via the bookmark toggle on the movie page, on any movie
 straight from search results (`m` works too). Anonymous marks live in `localStorage` only;
 signed-in marks live in PostgreSQL (`marked_movies`, migrated from localStorage on first
 authenticated load — additive and idempotent, mark notes included). A mark can carry an
-optional personal note (≤500 chars): on cards it sits muted under the info row with an
-inline ✎ editor; on the movie page, under the actions row. Anonymous notes stay in
-`localStorage`; shared URLs never contain notes. The header shows `Marked · N` (hidden
+optional personal note (≤500 chars): a small page-icon toggle sits flush under the
+bookmark on cards and in the playlist picker; the movie page shows a plain `+ note`
+under the mark toggle, swapping to the pencil beside a saved note; on cards a present
+note turns the page icon accent (still outlined), its tooltip reading Edit note. The
+note itself reads muted next to the affordance. The inline editor takes focus on open; ⌘/Ctrl+Enter
+saves, Escape cancels. Anonymous notes stay in `localStorage`; shared URLs never contain
+notes. The header shows `Marked · N` (hidden
 until your first mark): for anonymous users it opens `/list?movie=…` (the URL *is* the
 list — share it as-is or via the QR dialog, print it with original titles and directors,
 clear it after a confirm); for signed-in users it opens `/marked` (Share/Print/Clear

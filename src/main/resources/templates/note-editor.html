@@ -6,7 +6,7 @@
       th:attr="hx-post=${url}"
       hx-target="closest .card-note"
       hx-swap="outerHTML">
-    <textarea name="note" maxlength="500" rows="2" placeholder="Why this one?"
+    <textarea name="note" maxlength="500" rows="2" placeholder="Note (optional)"
               aria-label="Note" th:text="${note}"></textarea>
     <div class="card-note-actions">
         <button type="submit" class="chip-button">Save</button>

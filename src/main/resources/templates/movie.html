@@ -18,11 +18,6 @@
                     <span th:if="${vm.genres() != null}" th:text="${vm.genres()}">Genres</span>
                 </p>
                 <div class="actions-row">
-                    <a class="trailers-button"
-                       th:if="${!vm.videos().isEmpty()}"
-                       th:href="'https://www.youtube.com/watch?v=' + ${vm.videos()[0].key()}"
-                       data-dialog="trailers"
-                       th:text="'Trailers (' + ${#lists.size(vm.videos())} + ')'">Trailers</a>
                     <button type="button"
                             class="mark-toggle"
                             th:classappend="${marked} ? 'marked'"
@@ -36,9 +31,17 @@
                      anonymous users get the same affordance client-side (local storage);
                      the slot always renders so a fresh mark can drop the fragment in
                      (:empty hides it while unmarked) -->
-                <div class="movie-note"><th:block th:if="${marked}" th:with="note=${markNote}, editUrl='/marked/' + ${vm.tmdbId()} + '/note/edit'"><div th:replace="~{note-area}"></div></th:block></div>
+                <div class="movie-note"><th:block th:if="${marked}" th:with="note=${markNote}, editUrl='/marked/' + ${vm.tmdbId()} + '/note/edit', movieNote=true"><div th:replace="~{note-area}"></div></th:block></div>
                 <div class="movie-playlists-row">
                     <div th:replace="~{playlist-chips :: chips(${memberships}, ${vm.tmdbId()}, false)}"></div>
+                </div>
+                <!-- the trailers chip sits below the playlist chips, out of the
+                     actions row — the mark toggle and its note icon lead there -->
+                <div class="movie-trailers-row" th:if="${!vm.videos().isEmpty()}">
+                    <a class="trailers-button"
+                       th:href="'https://www.youtube.com/watch?v=' + ${vm.videos()[0].key()}"
+                       data-dialog="trailers"
+                       th:text="'Trailers (' + ${#lists.size(vm.videos())} + ')'">Trailers</a>
                 </div>
             </div>
         </header>

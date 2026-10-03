@@ -41,7 +41,7 @@
             </button>
             <form method="post" th:action="'/playlists/' + ${id} + '/description'" class="playlist-desc-form" data-desc-form hidden>
                 <textarea name="description" maxlength="1000" rows="2" aria-label="Playlist description"
-                          placeholder="What is this playlist about?" th:text="${description}"></textarea>
+                          placeholder="Description (optional)" th:text="${description}"></textarea>
                 <button type="submit" class="chip-button">Save</button>
             </form>
         </div>

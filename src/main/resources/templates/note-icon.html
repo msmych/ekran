@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="icon(size)">
+    <!-- a page with a folded corner and two text lines — the note affordance on
+     cards and in the picker; the movie page uses its own instead -->
+    <svg viewBox="0 0 16 16" th:width="${size}" th:height="${size}" aria-hidden="true">
+        <path d="M3.5 1.5h6l3 3v10h-9z"/>
+        <path d="M9.5 1.5v3h3"/>
+        <path d="M5.5 8.5h5M5.5 11h5"/>
+    </svg>
+</th:block>
+</body>
+</html>
