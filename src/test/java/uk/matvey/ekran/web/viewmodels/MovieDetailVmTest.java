@@ -67,7 +67,7 @@ class MovieDetailVmTest {
     @Test
     void movieWithoutVideosYieldsEmptyList() {
         var vm = MovieDetailVm.of(new Movie(
-            1, "Movie", null, null, null, List.of(), null, null, null, null,
+            1, "Movie", null, null, null, List.of(), null, null, null,
             List.of(), List.of(), List.of(), "en", List.of()
         ));
 
@@ -77,7 +77,7 @@ class MovieDetailVmTest {
     @Test
     void videosAreRankedBestFirst() {
         var vm = MovieDetailVm.of(new Movie(
-            1, "Movie", null, null, null, List.of(), null, null, null, null,
+            1, "Movie", null, null, null, List.of(), null, null, null,
             List.of(), List.of(), List.of(), "ja",
             List.of(
                 video("enTrailer", "Trailer", true, "en", "2020-01-01T00:00:00Z"),

@@ -39,7 +39,7 @@ The user can go from an empty browser tab to the relevant movie/person informati
 
 - Homepage is a search-first interface with the search input automatically focused.
 - Search-as-you-type with ~100 ms debounce, returning an HTML fragment.
-- Movie detail page: title, release date/year, runtime, genres, rating, overview, director, principal cast, writers, poster.
+- Movie detail page: title, release date/year, runtime, genres, overview, director, principal cast, writers, poster (click for the full-size version).
 - Person links are navigable from movie pages.
 - Person page with filmography, filterable by department (directing / acting / writing).
 - Deep-linkable URLs for movies, people, and searches.

@@ -13,7 +13,7 @@ Principles: fast tests, no network, no real API key, boring tools (JUnit 5 + Ass
 
 ### Services
 - `SearchService`: blank/whitespace query → empty; trimming; oversized query → empty; repository failure → typed error surfaced; success path passes results through with correct VM shape.
-- `MovieService`: repository hit → assembled VM (runtime formatting `1h 52m`, rating rounding, writers with jobs, cast links); repository miss → not-found.
+- `MovieService`: repository hit → assembled VM (runtime formatting `1h 52m`, writers with jobs, cast links); repository miss → not-found.
 - Filmography grouping/sorting/filtering (department pages, year-desc, undated last, bad department → not-found) is covered via `TmdbMapperTest` mapping and `RoutesTest` route assertions — `PersonService` itself is a thin passthrough with no separate unit test.
 
 ### Config

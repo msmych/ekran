@@ -61,7 +61,6 @@ public class TmdbMapper {
             localDate(response.releaseDate()),
             response.runtime(),
             genres(response),
-            response.voteAverage(),
             response.overview(),
             imageUrl("w342", response.posterPath()),
             imageUrl("w780", response.backdropPath()),

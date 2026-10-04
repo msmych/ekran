@@ -7,17 +7,17 @@
     <div th:replace="~{header :: header(false)}"></div>
     <article class="movie">
         <header class="movie-head">
-            <img class="poster" th:if="${vm.posterUrl() != null}" th:src="${vm.posterUrl()}" alt="">
+            <!-- the small poster opens its full-size version in a dialog -->
+            <th:block th:if="${vm.posterUrl() != null}">
+                <button type="button" class="poster-button" data-dialog="poster" aria-label="View full poster">
+                    <img class="poster" th:src="${vm.posterUrl()}" alt="">
+                </button>
+            </th:block>
             <div class="movie-info">
-                <h2 th:text="${vm.title()}">Title</h2>
-                <p class="original-title" th:if="${vm.originalTitle() != null}" th:text="${vm.originalTitle()}">Original title</p>
-                <p class="meta-line">
-                    <span th:if="${vm.year() != null}" th:text="${vm.year()}">1979</span>
-                    <span th:if="${vm.runtime() != null}" th:text="${vm.runtime()}">1h 52m</span>
-                    <span th:if="${vm.rating() != null}" th:text="${vm.rating()}">7.8 ★</span>
-                    <span th:if="${vm.genres() != null}" th:text="${vm.genres()}">Genres</span>
-                </p>
-                <div class="actions-row">
+                <!-- the mark toggle sits at the title row's right edge, the
+                     same corner it takes in the cards' row view -->
+                <div class="movie-title-row">
+                    <h2 th:text="${vm.title()}">Title</h2>
                     <button type="button"
                             class="mark-toggle"
                             th:classappend="${marked} ? 'marked'"
@@ -27,16 +27,23 @@
                         <th:block th:replace="~{bookmark-icon :: icon(18)}"></th:block>
                     </button>
                 </div>
-                <!-- the mark's own note — independent from any playlist membership note;
-                     anonymous users get the same affordance client-side (local storage);
-                     the slot always renders so a fresh mark can drop the fragment in
-                     (:empty hides it while unmarked) -->
-                <div class="movie-note"><th:block th:if="${marked}" th:with="note=${markNote}, editUrl='/marked/' + ${vm.tmdbId()} + '/note/edit', movieNote=true"><div th:replace="~{note-area}"></div></th:block></div>
+                <p class="original-title" th:if="${vm.originalTitle() != null}" th:text="${vm.originalTitle()}">Original title</p>
+                <p class="meta-line">
+                    <span th:if="${vm.year() != null}" th:text="${vm.year()}">1979</span>
+                    <span th:if="${vm.runtime() != null}" th:text="${vm.runtime()}">1h 52m</span>
+                    <span th:if="${vm.genres() != null}" th:text="${vm.genres()}">Genres</span>
+                </p>
+<!-- the user's note on the movie — its own thing, independent of the mark
+                     (marks are the bare inbox): noting needs no mark, unmarking and
+                     moving marks into playlists never touch it. Notes are a
+                     signed-in feature: the slot renders only then (:empty hides
+                     it from anonymous visitors) -->
+                <div class="movie-note"><th:block th:if="${userId != null}" th:with="note=${movieNote}, editUrl='/movies/' + ${vm.tmdbId()} + '/note/edit', movieNote=true"><div th:replace="~{note-area}"></div></th:block></div>
                 <div class="movie-playlists-row">
                     <div th:replace="~{playlist-chips :: chips(${memberships}, ${vm.tmdbId()}, false)}"></div>
                 </div>
                 <!-- the trailers chip sits below the playlist chips, out of the
-                     actions row — the mark toggle and its note icon lead there -->
+                     title row — the note icon leads the row above it -->
                 <div class="movie-trailers-row" th:if="${!vm.videos().isEmpty()}">
                     <a class="trailers-button"
                        th:href="'https://www.youtube.com/watch?v=' + ${vm.videos()[0].key()}"
@@ -81,6 +88,13 @@
         <p class="external-links">
             <a th:href="${vm.tmdbUrl()}" target="_blank" rel="noopener">TMDB ↗</a>
         </p>
+        <dialog id="poster" aria-labelledby="poster-dialog-title" th:if="${vm.posterUrl() != null}">
+            <div class="dialog-head">
+                <h2 id="poster-dialog-title" th:text="${vm.title()}">Title</h2>
+                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+            </div>
+            <img class="poster-full" th:src="${vm.fullPosterUrl()}" th:alt="${vm.title()}">
+        </dialog>
         <dialog id="trailers" aria-labelledby="trailers-dialog-title" th:if="${!vm.videos().isEmpty()}">
             <div class="dialog-head">
                 <h2 id="trailers-dialog-title">Trailers</h2>

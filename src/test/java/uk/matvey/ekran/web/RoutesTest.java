@@ -30,6 +30,8 @@ import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
 import uk.matvey.ekran.marks.InMemoryMarksRepository;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.InMemoryMovieNotesRepository;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.repository.MovieRepository;
@@ -46,7 +48,7 @@ class RoutesTest {
 
     private static final Movie ALIEN_MOVIE = new Movie(
         348, "Alien", null, LocalDate.parse("1979-05-25"), 117,
-        List.of("Science Fiction", "Horror"), 8.2, "In space no one can hear you scream.",
+        List.of("Science Fiction", "Horror"), "In space no one can hear you scream.",
         URI.create("https://img/poster.jpg"), null,
         List.of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
         List.of(new PersonLink(2, "Dan O'Bannon", "Screenplay", Department.WRITING)),
@@ -59,7 +61,7 @@ class RoutesTest {
 
     private static final Movie ALIENS_MOVIE = new Movie(
         9471, "Aliens", null, LocalDate.parse("1986-07-18"), 137,
-        List.of("Action", "Science Fiction"), 8.1, "This time it's war.",
+        List.of("Action", "Science Fiction"), "This time it's war.",
         URI.create("https://img/aliens-poster.jpg"), null,
         List.of(), List.of(), List.of(), "en", List.of()
     );
@@ -130,7 +132,7 @@ class RoutesTest {
                 var body = http.get(path).body().string();
                 assertThat(body).contains("src=\"/js/search.js\"");
                 assertThat(body).contains("href=\"/about\"");
-                // Cmd+K tip badge only on the compact overlay search
+                // `/` tip badge only on the compact overlay search
                 assertThat(body).contains("id=\"search-kbd\"");
             }
             // home: no tip badge — the input is already focused and prominent
@@ -144,7 +146,6 @@ class RoutesTest {
             assertThat(js).contains("code === 'KeyK'");
             assertThat(js).contains("i.blur()");
             assertThat(js).contains("ArrowDown");
-            assertThat(js).contains("'Ctrl K'");
         });
     }
 
@@ -451,7 +452,7 @@ class RoutesTest {
     void moviePageWithoutVideosHasNoTrailersLinkOrDialog() {
         var movie = new Movie(
             100, "Movie", null, null, null,
-            List.of(), null, "Overview", null, null,
+            List.of(), "Overview", null, null,
             List.of(), List.of(), List.of(), null, List.of()
         );
         var app = appWithRepositories(
@@ -554,7 +555,7 @@ class RoutesTest {
     @Test
     void listCardFragmentRendersSingleCardWithPrintExtras() {
         var movie = new Movie(348, "Alien", "Alien: The Eighth Passenger", LocalDate.parse("1979-05-25"), 117,
-            List.of("Science Fiction"), 8.2, null, null, null,
+            List.of("Science Fiction"), null, null, null,
             List.of(new PersonLink(1, "Ridley Scott", "Director", Department.DIRECTING)),
             List.of(), List.of(), "en", List.of());
         var app = appWithRepositories(
@@ -683,9 +684,10 @@ class RoutesTest {
                 // which sent stale mark lists on click (bug seen in prod)
                 var body = http.get(path).body().string();
                 assertThat(body).contains("data-marked-link");
-                assertThat(body).contains("hx-boost=\"false\">Marked");
+                // the bookmark glyph leads the label
+                assertThat(body).contains("M3.5 1.5h9a1 1 0 0 1 1 1v12l-5.5-3.7");
+                assertThat(body).contains("Marked · <span data-marked-count>");
                 assertThat(body).doesNotContain("data-marked-link hidden");
-                assertThat(body).contains("data-marked-count");
             }
         });
     }
@@ -693,7 +695,7 @@ class RoutesTest {
     private static Movie movieWithId(long id) {
         return new Movie(
             id, "Movie " + id, null, null, null,
-            List.of(), null, null, null, null,
+            List.of(), null, null, null,
             List.of(), List.of(), List.of(), null, List.of()
         );
     }
@@ -707,7 +709,14 @@ class RoutesTest {
             var body = response.body().string();
             assertThat(body).contains("Alien");
             assertThat(body).contains("1h 57m");
-            assertThat(body).contains("8.2 ★");
+            // the movie page no longer shows the TMDB rating
+            assertThat(body).doesNotContain("★");
+            // the mark toggle sits in the title row, the poster opens its
+            // full-size version in a dialog
+            assertThat(body).contains("movie-title-row");
+            assertThat(body).contains("data-dialog=\"poster\"");
+            assertThat(body).contains("<dialog id=\"poster\"");
+            assertThat(body).contains("src=\"https://img/poster.jpg\"");
             assertThat(body).contains("<h3>Director</h3>");
             assertThat(body).contains("<h3>Writer</h3>");
             assertThat(body).contains("href=\"/persons/1/directing\"");
@@ -723,7 +732,7 @@ class RoutesTest {
     void moviePagePluralizesCrewHeadings() {
         var movie = new Movie(
             100, "Movie", null, null, null,
-            List.of(), null, null, null, null,
+            List.of(), null, null, null,
             List.of(new PersonLink(1, "One", "Director", Department.DIRECTING),
                new PersonLink(2, "Two", "Director", Department.DIRECTING)),
             List.of(new PersonLink(3, "Three", "Screenplay", Department.WRITING),
@@ -907,6 +916,7 @@ assertThat(body).contains("href=\"/movies/348\"");
                 false,
                 Clock.systemUTC()),
             new MarksService(new InMemoryMarksRepository()),
+            new MovieNotesService(new InMemoryMovieNotesRepository()),
             new PlaylistsService(new InMemoryPlaylistsRepository()),
             true,
             null

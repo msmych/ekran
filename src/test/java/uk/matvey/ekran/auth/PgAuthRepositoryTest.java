@@ -52,7 +52,7 @@ class PgAuthRepositoryTest {
     void migrationsAreIdempotent() {
         DbMigrations.migrate(dataSource);
 
-        assertThat(migrationCount()).isEqualTo(6);
+        assertThat(migrationCount()).isEqualTo(7);
     }
 
     @Test

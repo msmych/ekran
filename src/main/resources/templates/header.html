@@ -6,19 +6,24 @@
          when this element exists; ids live in PostgreSQL, localStorage is untouched -->
     <span th:if="${userId != null}" data-authenticated th:attr="data-marked-ids=${markedIdsCsv}" hidden></span>
     <h1 class="logo"><a href="/">ekran</a></h1>
+    <!-- desktop: logo left, search centered between it and the corner actions;
+         home and narrow screens wrap the search to its own full-width line
+         (the order rule below keeps the actions on the first line) -->
+    <th:block th:replace="~{searchbar :: searchbar(${live})}"></th:block>
     <div class="header-actions">
         <!-- anonymous: the marked link is the list entry point; signed in it
              lives in the account popup instead -->
         <a class="marked-link" th:if="${userEmail == null}" href="/list" data-marked-link
-           hx-boost="false">Marked · <span data-marked-count>0</span></a>
+           hx-boost="false"><th:block th:replace="~{bookmark-icon :: icon(14)}"></th:block>Marked · <span data-marked-count>0</span></a>
         <a class="signin-link" th:if="${userEmail == null}" th:href="@{/signin(next=${currentPath})}">Sign in</a>
         <details class="account" th:if="${userEmail != null}" data-account-menu>
             <summary class="signin-link">Account</summary>
             <div class="account-menu">
                 <div class="account-email" th:text="${userEmail}">email</div>
                 <a class="account-marked" href="/marked" data-marked-link hx-boost="false"
-                   th:hidden="${#strings.isEmpty(markedIdsCsv)}">Marked · <span data-marked-count>0</span></a>
+                   th:hidden="${#strings.isEmpty(markedIdsCsv)}"><th:block th:replace="~{bookmark-icon :: icon(14)}"></th:block>Marked · <span data-marked-count>0</span></a>
                 <a class="account-playlists" href="/playlists">Playlists · <span th:text="${playlistsCount}">0</span></a>
+                <a class="account-notes" href="/notes">Notes · <span th:text="${notesCount}">0</span></a>
                 <form method="post" action="/signout" hx-boost="false">
                     <input type="hidden" name="next" th:value="${currentPath}">
                     <button class="account-signout" type="submit">Sign out</button>
@@ -26,7 +31,6 @@
             </div>
         </details>
     </div>
-    <th:block th:replace="~{searchbar :: searchbar(${live})}"></th:block>
 </div>
 </body>
 </html>

@@ -124,13 +124,15 @@ body {
 }
 
 /* shared outline-icon base (bookmark toggles, list-name pencil, note
-   toggles, picker check); the filled state (…marked svg path below) flips
-   fill/stroke */
+    toggles, picker check, the marked links' bookmark); the filled state
+    (…marked svg path below) flips fill/stroke */
 .card-mark svg path,
 .mark-toggle svg path,
 .card-note-toggle svg path,
 .list-name-edit svg path,
-.pick-mark svg path {
+.pick-mark svg path,
+.marked-link svg path,
+.account-marked svg path {
     fill: none;
     stroke: currentColor;
     stroke-width: 1.4;
@@ -255,9 +257,9 @@ body {
     margin: 0;
 }
 
-/* header: logo left, [marked · account · search] clustered on the right */
+/* header: logo left, account/sign-in cluster in the right corner, search
+   centered between them (space-between over the three header-row items) */
 .header-actions {
-    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 16px;
@@ -268,6 +270,15 @@ body {
     color: var(--muted);
     text-decoration: none;
     white-space: nowrap;
+}
+
+/* the bookmark glyph leads the label in both marked links (header,
+   account menu); stroke follows the link's color, hover accent included */
+.marked-link svg,
+.account-marked svg {
+    display: inline-block;
+    vertical-align: -2px;
+    margin-right: 3px;
 }
 
 .marked-link:hover {
@@ -389,7 +400,11 @@ body {
     flex-wrap: wrap;
 }
 
+/* DOM order is logo, search, actions (desktop center); home wraps the search
+   to its own line, so it also goes last in the wrap sequence — the actions
+   stay on the first line */
 .home-header-row .home-search {
+    order: 1;
     flex-basis: 100%;
     margin-top: 16px;
 }
@@ -504,10 +519,30 @@ body {
     margin-bottom: 16px;
 }
 
+/* the info column takes the full remaining width, so the title row's
+   mark toggle reaches the head's far right edge */
+.movie-info {
+    flex: 1;
+    min-width: 0;
+}
+
 .poster {
     width: 140px;
     border-radius: 8px;
     flex: none;
+}
+
+/* the small poster opens its full-size version in a dialog */
+.poster-button {
+    padding: 0;
+    border: none;
+    background: none;
+    flex: none;
+    cursor: zoom-in;
+}
+
+.poster-button .poster {
+    display: block;
 }
 
 .profile {
@@ -579,12 +614,11 @@ body {
     margin-left: 8px;
 }
 
-.actions-row {
+.movie-title-row {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 8px;
-    margin: 12px 0 0;
 }
 
 /* the icon-only mark control; padding gives it a usable tap target
@@ -667,6 +701,19 @@ dialog {
 
 dialog::backdrop {
     background: rgba(0, 0, 0, 0.5);
+}
+
+/* the full poster wants no 720px dialog chrome — the image sizes it */
+#poster {
+    width: min(480px, calc(100% - 32px));
+}
+
+#poster .poster-full {
+    display: block;
+    width: 100%;
+    max-height: calc(100vh - 120px);
+    object-fit: contain;
+    border-radius: 0 0 8px 8px;
 }
 
 /* a modal <dialog> does not lock background scrolling: wheel/touch on the
@@ -814,6 +861,16 @@ html:has(dialog[open]) body {
     gap: 8px;
 }
 
+/* the narrow-screen ⋯ menu wrapper — on wide screens it is transparent
+   (contents: .list-actions flows as a plain .list-head flex item) */
+.list-menu {
+    display: contents;
+}
+
+.list-menu-toggle {
+    display: none;
+}
+
 .movie-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
@@ -932,11 +989,6 @@ html:has(dialog[open]) body {
     top: 17px;
     right: 0;
     margin: 0;
-}
-
-/* a present note keeps clear of the pinned icon */
-.movie-cards:not([data-view="rows"]) .card-note:has(.card-note-text) {
-    padding-right: 30px;
 }
 
 /* the bare icon state adds no row of its own */
@@ -1195,13 +1247,93 @@ kbd {
         flex-wrap: wrap;
     }
 
+    /* same wrap ordering as home: search takes its own line, the actions
+       stay beside the logo on the first */
     .site-search {
+        order: 1;
         flex-basis: 100%;
     }
 
     .site-search #search-input,
     .site-search #search-input:focus {
         width: 100%;
+    }
+
+    /* narrow screens: the list actions don't fit beside the title — the row
+       folds into the ⋯ dropdown (open state is marked.js's data-open; the
+       panel mirrors the account menu look) */
+    .list-menu {
+        display: block;
+        position: relative;
+        margin-left: auto;
+        flex: none;
+    }
+
+    .list-menu-toggle {
+        display: inline-flex;
+        padding: 2px 10px;
+        font-size: 16px;
+        line-height: 1.4;
+    }
+
+    .list-menu .list-actions {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 30;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-width: 200px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .list-menu .list-actions[data-open] {
+        display: flex;
+    }
+
+    /* the panel reads like the account menu: plain muted rows, hairline
+       separators, hover accent — the pill chrome is undone */
+    .list-menu .list-actions {
+        gap: 0;
+    }
+
+    .list-menu .list-actions .chip-button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        font-size: 14px;
+        color: var(--muted);
+        background: none;
+    }
+
+    .list-menu .list-actions .chip-button:hover {
+        color: var(--accent);
+        border-color: var(--border);
+    }
+
+    /* a row gets the account menu's separator (padding + hairline) only when
+       a visible row follows it — rows toggled away by [hidden] never count,
+       so no stray hairline under the last visible row */
+    .list-menu .list-actions > .chip-button:has(~ :not([hidden])),
+    .list-menu .list-actions > :has(~ :not([hidden])) .chip-button {
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    /* the delete form dissolves so its button is a plain menu row */
+    .list-menu .list-actions form {
+        display: contents;
     }
 }
 
@@ -1219,6 +1351,7 @@ kbd {
     #topbar,
     .header-row,
     .list-actions,
+    .list-menu-toggle,
     .list-name-edit,
     .list-name-input,
     .card-mark,
@@ -1228,6 +1361,7 @@ kbd {
     .card-note-form,
     .card-note-cancel,
     .empty-list,
+    .playlist-desc-placeholder,
     .tmdb-footer {
         display: none !important;
     }
@@ -1341,9 +1475,10 @@ kbd {
     border-color: var(--text);
 }
 
-/* account menu: marked + playlists links */
+/* account menu: marked + playlists + notes links */
 .account-marked,
-.account-playlists {
+.account-playlists,
+.account-notes {
     display: block;
     font-size: 14px;
     color: var(--muted);
@@ -1354,7 +1489,8 @@ kbd {
 }
 
 .account-marked:hover,
-.account-playlists:hover {
+.account-playlists:hover,
+.account-notes:hover {
     color: var(--accent);
 }
 
@@ -1512,10 +1648,11 @@ kbd {
     color: var(--accent);
 }
 
-/* personal notes: mark notes (marked page, movie page), membership notes
-   (playlist page, picker dialog) — plain text plus a light inline editor;
-   the row puts the toggle at the end, right under the card's bookmark
-   (the movie page flips it to the front, below the mark toggle) */
+/* personal notes: movie notes (marked page, movie page — detached from
+    marks, they survive unmarking and playlist moves), membership notes
+    (playlist page, picker dialog) — plain text plus a light inline editor;
+    the row puts the toggle at the end, right under the card's bookmark
+    (the movie page flips it to the front of the block) */
 .card-note {
     display: flex;
     align-items: flex-start;
@@ -1533,10 +1670,8 @@ kbd {
     overflow-wrap: anywhere;
 }
 
-/* the toggle's text state ("+ note" on the movie page) sets the baseline;
-   the icon variants — the page icon on cards, the pencil on the movie
-   page — get a padded tap target, the negative margins keeping the glyph
-   where the text sits */
+/* the icon toggle gets a padded tap target, the negative margins keeping
+   the glyph where the bare text sat */
 .card-note-toggle {
     flex: none;
     border: none;
@@ -1552,10 +1687,9 @@ kbd {
     display: block;
 }
 
-/* hover; and a present note on cards — the glyph stays outlined, just
-   accent (the movie-page pencil keeps its muted color) */
+/* hover; a present note turns the glyph accent (still outlined) */
 .card-note-toggle:hover,
-.card-note-toggle.has-note:not(.note-pencil) {
+.card-note-toggle.has-note {
     color: var(--accent);
 }
 
@@ -1613,22 +1747,14 @@ kbd {
     color: var(--accent);
 }
 
-/* movie page: the mark's note block under the mark toggle */
+/* movie page: the note block spans the full info column */
 .movie-note {
     margin-top: 8px;
-    max-width: 480px;
 }
 
-/* movie page: the affordance leads the row, right under the mark toggle —
-   plain "+ note" while empty, the pencil beside a saved note */
+/* movie page: the page icon leads the block, ahead of the note text */
 .movie-note .card-note-toggle {
     order: -1;
-}
-
-/* the pencil aligns with the bookmark icon above it (the mark toggle's
-   8px leading padding) */
-.movie-note .card-note-toggle:has(svg) {
-    margin-left: 2px;
 }
 
 /* the slot always renders so a fresh mark can drop the note fragment in;
@@ -1670,6 +1796,17 @@ kbd {
     font-size: 13px;
     line-height: 1.5;
     color: var(--muted);
+    /* the text itself starts the edit, like the title rename */
+    cursor: pointer;
+}
+
+/* the no-description-yet affordance reads as a hint */
+.playlist-desc-placeholder {
+    font-style: italic;
+}
+
+.playlist-desc-placeholder:hover {
+    color: var(--accent);
 }
 
 .playlist-desc .list-name-edit {

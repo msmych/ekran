@@ -20,17 +20,23 @@
                 </button>
             </h2>
             <input type="text" class="list-name-input" data-list-name-input maxlength="60" aria-label="List name" hidden>
-            <div class="list-actions">
-                <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
-                <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <button type="button" class="chip-button" th:if="${userId != null && !cards.isEmpty()}"
-                        data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
-                        hx-target="#playlist-select-body"
-                        hx-swap="innerHTML">Add to playlist</button>
-                <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
-                <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
-                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
+            <div class="list-menu">
+                <!-- narrow screens: the row of chips becomes this ⋯ dropdown —
+                     one DOM, the breakpoint only changes presentation -->
+                <button type="button" class="chip-button list-menu-toggle" data-list-menu
+                        aria-label="List actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+                <div class="list-actions">
+                    <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
+                    <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
+                    <button type="button" class="chip-button" th:if="${userId != null && !cards.isEmpty()}"
+                            data-dialog="playlist-select"
+                            th:attr="hx-get=@{/playlists/select(movie=${movieIds})}"
+                            hx-target="#playlist-select-body"
+                            hx-swap="innerHTML">Add to playlist</button>
+                    <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
+                    <button type="button" class="chip-button" data-mark-all hidden>Add all to marked</button>
+                    <button type="button" class="chip-button" data-clear-marks hidden>Clear all</button>
+                </div>
             </div>
         </div>
         <ul class="movie-cards">

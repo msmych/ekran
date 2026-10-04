@@ -22,6 +22,8 @@ import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.SearchResultPage;
 import uk.matvey.ekran.marks.InMemoryMarksRepository;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.InMemoryMovieNotesRepository;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.service.MovieService;
@@ -33,11 +35,11 @@ class AuthRoutesTest {
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("token=([A-Za-z0-9_-]{43})");
 
     private static final Movie GODFATHER_MOVIE = new Movie(
-        238, "The Godfather", null, null, null, List.of(), null, null, null, null,
+        238, "The Godfather", null, null, null, List.of(), null, null, null,
         List.of(), List.of(), List.of(), null, List.of());
 
     private static final Movie PULP_MOVIE = new Movie(
-        680, "Pulp Fiction", null, null, null, List.of(), null, null, null, null,
+        680, "Pulp Fiction", null, null, null, List.of(), null, null, null,
         List.of(), List.of(), List.of(), null, List.of());
 
     // redirect assertions need the raw 3xx — the default client follows them
@@ -240,6 +242,45 @@ class AuthRoutesTest {
 
             assertThat(response.code()).isEqualTo(303);
             assertThat(response.header("Location")).startsWith("/signin");
+        });
+    }
+
+    @Test
+    void notesPageRequiresAuthentication() {
+        authTest((server, http) -> {
+            var response = http.get("/notes");
+
+            assertThat(response.code()).isEqualTo(303);
+            assertThat(response.header("Location")).startsWith("/signin");
+        });
+    }
+
+    @Test
+    void notesPageListsNotedMoviesInRowsView() {
+        JavalinTest.test(appWithMovies(), new TestConfig(false, false, NO_REDIRECTS), (server, http) -> {
+            var sessionId = signIn(http, "noter@bar.com");
+            http.request("/movies/238/note", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
+            });
+            http.request("/movies/680/note", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("note", "with mom").build());
+            });
+
+            var page = http.get("/notes", r -> r.header("Cookie", cookie(sessionId))).body().string();
+            // rows is the page's default view; the chip offers Grid
+            assertThat(page).contains("data-view=\"rows\"");
+            assertThat(page).contains("aria-pressed=\"true\">Grid</button>");
+            assertThat(page).contains("diner scene is perfect");
+            assertThat(page).contains("with mom");
+            assertThat(page).contains("hx-get=\"/movies/238/note/edit\"");
+            // the account menu counts the notes
+            assertThat(page).contains("Notes · <span>2</span>");
+
+            // the movie page advertises the n hotkey on its note affordance
+            var movie = http.get("/movies/238", r -> r.header("Cookie", cookie(sessionId))).body().string();
+            assertThat(movie).contains("aria-label=\"Edit note (n)\"");
         });
     }
 
@@ -583,6 +624,7 @@ void playlistDetailRendersReorderControls() {
         new PersonService(id -> java.util.Optional.empty()),
         authService,
         new MarksService(new InMemoryMarksRepository()),
+        new MovieNotesService(new InMemoryMovieNotesRepository()),
         new PlaylistsService(new InMemoryPlaylistsRepository()),
         true,
         null);
@@ -678,21 +720,22 @@ void playlistEndpointsRejectAnonymous() {
     }
 
 @Test
-    void playlistDialogWithoutMoveKeepsMarksAndNotes() {
+    void playlistDialogWithoutMoveKeepsMarksAndMovieNotes() {
         authTest((server, http) -> {
             var sessionId = signIn(http, "composer@bar.com");
             http.request("/marked", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
             });
-            http.request("/marked/238/note", r -> {
+            http.request("/movies/238/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
             });
 
             // no move flag (shared lists, plain dialog posts): a copy — the
-            // marks stay and each mark's note carries into the membership;
-            // the dialog stays on the page with a confirmation
+            // marks stay, the new memberships start bare (playlist notes are
+            // written deliberately, never inherited); the dialog stays on the
+            // page with a confirmation
             var create = http.request("/playlists", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.header("HX-Request", "true");
@@ -706,12 +749,15 @@ void playlistEndpointsRejectAnonymous() {
             assertThat(create.body().string()).contains("Created Watched in 2026 with 2 movies");
             var playlistId = playlistIdFromDialog(http, sessionId);
             assertThat(idsOf(http, sessionId)).isEqualTo("238,680");
-            // the mark note was carried into the membership
-            var membershipNote = http.get("/playlists/" + playlistId + "/movies/238/note",
-                r -> r.header("Cookie", cookie(sessionId)));
-            assertThat(membershipNote.body().string()).contains("diner scene is perfect");
+            // no inheritance: the membership notes start empty
+            assertThat(http.get("/playlists/" + playlistId + "/movies/238/note",
+                r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("aria-label=\"Add note\"");
             assertThat(http.get("/playlists/" + playlistId + "/movies/680/note",
                 r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("aria-label=\"Add note\"");
+
+            // the movie note is untouched — it stays on the movie page
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
+                .body().string()).contains("diner scene is perfect");
 
             // bulk-adding to an existing playlist keeps the marks too, and an
             // existing membership keeps its note (no overwrite on re-add)
@@ -722,7 +768,7 @@ void playlistEndpointsRejectAnonymous() {
             });
             assertThat(idsOf(http, sessionId)).isEqualTo("238,680");
             assertThat(http.get("/playlists/" + playlistId + "/movies/238/note",
-                r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("diner scene is perfect");
+                r -> r.header("Cookie", cookie(sessionId))).body().string()).contains("aria-label=\"Add note\"");
         });
     }
 
@@ -741,7 +787,7 @@ void playlistEndpointsRejectAnonymous() {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("movie", "238").add("movie", "680").build());
             });
-            http.request("/marked/238/note", r -> {
+            http.request("/movies/238/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
             });
@@ -773,10 +819,13 @@ void playlistEndpointsRejectAnonymous() {
             assertThat(createBody).contains("data-moved-movies=\"238,680\"");
             assertThat(idsOf(http, sessionId)).isEmpty();
             var playlistId = playlistIdFromDialog(http, sessionId);
-            // the membership inherited the mark note before the mark went
+            // the membership started bare — notes are never inherited; the
+            // movie note stayed on the movie page through the move
             assertThat(http.get("/playlists/" + playlistId + "/movies/238/note",
                 r -> r.header("Cookie", cookie(sessionId))).body().string())
-                .contains("diner scene is perfect");
+                .contains("aria-label=\"Add note\"");
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
+                .body().string()).contains("diner scene is perfect");
 
             // moving into an existing playlist works the same
             http.request("/marked", r -> {
@@ -818,75 +867,62 @@ void playlistEndpointsRejectAnonymous() {
     }
 
     @Test
-    void markNoteLifecycle() {
+    void movieNoteLifecycle() {
         // pages render cards — this test gets its own app with movie stubs
         JavalinTest.test(appWithMovies(), new TestConfig(false, false, NO_REDIRECTS), (server, http) -> {
             var sessionId = signIn(http, "noter@bar.com");
 
-            // the note belongs to the mark: nothing to annotate before marking —
-            // but the movie page always renders the note slot (:empty until marked,
-            // so a fresh mark can drop the fragment in client-side)
-            assertThat(http.request("/marked/238/note", r -> {
-                r.header("Cookie", cookie(sessionId));
-                r.post(new FormBody.Builder().add("note", "nope").build());
-            }).code()).isEqualTo(404);
-            var unmarkedMovie = http.get("/movies/238", r -> r.header("Cookie", cookie(sessionId))).body().string();
-            assertThat(unmarkedMovie).contains("<div class=\"movie-note\"></div>");
-            assertThat(unmarkedMovie).doesNotContain("card-note");
-
-            mark(http, sessionId, 238);
-
-            // editor pair: the display area (cancel target) and the editor form
-            assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
-                .body().string()).contains("aria-label=\"Add note\"");
-            var editor = http.get("/marked/238/note/edit", r -> r.header("Cookie", cookie(sessionId)));
-            var editorBody = editor.body().string();
-            assertThat(editorBody).contains("<textarea");
-            assertThat(editorBody).contains("hx-post=\"/marked/238/note\"");
-            assertThat(editorBody).contains("hx-get=\"/marked/238/note\"");
-
-            // saving trims and renders back the display area
-            var save = http.request("/marked/238/note", r -> {
+            // the note is detached from the mark: annotating needs no mark,
+            // and the movie page always renders the note slot
+            var save = http.request("/movies/238/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "  watch with family late Oct  ").build());
             });
             assertThat(save.body().string()).contains("watch with family late Oct");
 
-            // the note shows up on the marked page and the movie page
-            assertThat(http.get("/marked", r -> r.header("Cookie", cookie(sessionId))).body().string())
-                .contains("watch with family late Oct");
+            // editor pair: the display area (cancel target) and the editor form
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
+                .body().string()).contains("aria-label=\"Edit note\"");
+            var editor = http.get("/movies/238/note/edit", r -> r.header("Cookie", cookie(sessionId)));
+            var editorBody = editor.body().string();
+            assertThat(editorBody).contains("<textarea");
+            assertThat(editorBody).contains("hx-post=\"/movies/238/note\"");
+            assertThat(editorBody).contains("hx-get=\"/movies/238/note\"");
+
+            // the note shows up on the movie page before any mark exists
             assertThat(http.get("/movies/238", r -> r.header("Cookie", cookie(sessionId))).body().string())
                 .contains("watch with family late Oct");
 
-            // a blank note removes it without unmarking
-            http.request("/marked/238/note", r -> {
+            mark(http, sessionId, 238);
+
+            // the note shows up on the marked page too
+            assertThat(http.get("/marked", r -> r.header("Cookie", cookie(sessionId))).body().string())
+                .contains("watch with family late Oct");
+
+            // unmarking keeps the note — the whole point of the detach
+            unmark(http, sessionId, 238);
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
+                .body().string()).contains("watch with family late Oct");
+            assertThat(http.get("/movies/238", r -> r.header("Cookie", cookie(sessionId))).body().string())
+                .contains("watch with family late Oct");
+
+            // a blank note removes it
+            http.request("/movies/238/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "   ").build());
             });
-            assertThat(idsOf(http, sessionId)).isEqualTo("238");
-            assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
                 .body().string()).contains("aria-label=\"Add note\"");
 
             // too long is rejected, the note stays gone
-            assertThat(http.request("/marked/238/note", r -> {
+            assertThat(http.request("/movies/238/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "x".repeat(501)).build());
             }).code()).isEqualTo(400);
 
-            // unmarking removes the note along with the mark
-            mark(http, sessionId, 238);
-            http.request("/marked/238/note", r -> {
-                r.header("Cookie", cookie(sessionId));
-                r.post(new FormBody.Builder().add("note", "gone soon").build());
-            });
-            unmark(http, sessionId, 238);
-            mark(http, sessionId, 238);
-            assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
-                .body().string()).contains("aria-label=\"Add note\"");
-
             // anonymous users get nothing
-            assertThat(http.get("/marked/238/note").code()).isEqualTo(401);
-            assertThat(http.get("/marked/238/note/edit").code()).isEqualTo(401);
+            assertThat(http.get("/movies/238/note").code()).isEqualTo(401);
+            assertThat(http.get("/movies/238/note/edit").code()).isEqualTo(401);
         });
     }
 
@@ -992,7 +1028,7 @@ void playlistEndpointsRejectAnonymous() {
 
             // an existing account mark with its own note
             mark(http, sessionId, 680);
-            http.request("/marked/680/note", r -> {
+            http.request("/movies/680/note", r -> {
                 r.header("Cookie", cookie(sessionId));
                 r.post(new FormBody.Builder().add("note", "server 680").build());
             });
@@ -1009,11 +1045,11 @@ void playlistEndpointsRejectAnonymous() {
             assertThat(migrate.code()).isEqualTo(204);
 
             assertThat(idsOf(http, sessionId)).isEqualTo("680,238");
-            assertThat(http.get("/marked/238/note", r -> r.header("Cookie", cookie(sessionId)))
+            assertThat(http.get("/movies/238/note", r -> r.header("Cookie", cookie(sessionId)))
                 .body().string()).contains("watch with family");
-            assertThat(http.get("/marked/680/note", r -> r.header("Cookie", cookie(sessionId)))
+            assertThat(http.get("/movies/680/note", r -> r.header("Cookie", cookie(sessionId)))
                 .body().string()).contains("server 680");
-            assertThat(http.get("/marked/680/note", r -> r.header("Cookie", cookie(sessionId)))
+            assertThat(http.get("/movies/680/note", r -> r.header("Cookie", cookie(sessionId)))
                 .body().string()).doesNotContain("local 680");
 
             // idempotent: migrating again changes nothing
@@ -1023,7 +1059,7 @@ void playlistEndpointsRejectAnonymous() {
                     "{\"movies\":[{\"movieId\":680,\"note\":\"local 680\"}]}",
                     okhttp3.MediaType.parse("application/json")));
             });
-            assertThat(http.get("/marked/680/note", r -> r.header("Cookie", cookie(sessionId)))
+            assertThat(http.get("/movies/680/note", r -> r.header("Cookie", cookie(sessionId)))
                 .body().string()).contains("server 680");
 
             // garbage bodies are rejected, not 500s
@@ -1045,6 +1081,7 @@ void playlistEndpointsRejectAnonymous() {
             new PersonService(id -> java.util.Optional.empty()),
             authService,
             new MarksService(new InMemoryMarksRepository()),
+            new MovieNotesService(new InMemoryMovieNotesRepository()),
             new PlaylistsService(new InMemoryPlaylistsRepository()),
             true,
             null);
@@ -1131,6 +1168,7 @@ void playlistEndpointsRejectAnonymous() {
             new PersonService(id -> java.util.Optional.empty()),
             authService,
             new MarksService(new InMemoryMarksRepository()),
+            new MovieNotesService(new InMemoryMovieNotesRepository()),
             new PlaylistsService(new InMemoryPlaylistsRepository()),
             true,
             null

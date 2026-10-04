@@ -4,27 +4,17 @@
     var NAME_KEY = 'ekran.listName';
     var VIEW_KEY = 'ekran.cardsView';
     var NAME_MAX = 60;
-    var NOTE_MAX = 500;
     var MAX_SHARE = 100;
     var EDITABLE = /^(INPUT|TEXTAREA|SELECT)$/;
-    // the local twins of the server-rendered toggles (note-icon.html,
-    // pencil-icon.html)
-    var PAGE_ICON_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-        + '<path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3"/>'
-        + '<path d="M5.5 8.5h5M5.5 11h5"/></svg>';
-    var PENCIL_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-        + '<path d="M2.5 13.5l.7-3L11.3 2.4l2.3 2.3-8.1 8.1-3 .7z"/></svg>';
     var seedEl = document.querySelector('[data-authenticated]');
     // authenticated marks live in PostgreSQL: the server seeds the id set into
     // the header (re-rendered on every request), mutations go through /marked,
     // and localStorage is used exactly once — to migrate old anonymous marks
+    // (notes are a signed-in feature, there is nothing local to migrate)
     var AUTHENTICATED = !!seedEl;
     var MARKED_PAGE = location.pathname === '/marked';
     var LIST_PAGE = location.pathname === '/list';
     var ids = AUTHENTICATED ? loadSeed() : load();
-    // anonymous notes: movieId → note; they live only in localStorage and never
-    // leave the browser except via the explicit login migration
-    var notes = {};
     var copyTimer = null;
 
     // boosted navigation swaps the page without reloading this script — the
@@ -39,11 +29,10 @@
         return raw.split(',').filter(Boolean).map(Number);
     }
 
-    // accepts both the legacy format ([238, 680]) and the notes format
-    // ([{movieId: 238, note: "watch with family"}]); the notes map is rebuilt
-    // from storage on every load so it never carries stale entries
+    // accepts both the plain format ([238, 680]) and the legacy one
+    // ([{movieId: 238, note: …}] — notes once lived inside the marks list;
+    // notes are a signed-in feature now, so any legacy note is dropped)
     function load() {
-        notes = {};
         try {
             var raw = JSON.parse(localStorage.getItem(KEY) || '[]');
             if (!(raw instanceof Array)) {
@@ -54,25 +43,18 @@
             for (var k = 0; k < raw.length; k++) {
                 var entry = raw[k];
                 var id = null;
-                var note = null;
                 if (typeof entry === 'number' && isFinite(entry) && Math.floor(entry) === entry && entry > 0) {
                     id = entry;
                 } else if (entry && typeof entry === 'object'
                     && typeof entry.movieId === 'number' && isFinite(entry.movieId)
                     && Math.floor(entry.movieId) === entry.movieId && entry.movieId > 0) {
                     id = entry.movieId;
-                    if (typeof entry.note === 'string' && entry.note.trim()) {
-                        note = entry.note;
-                    }
                 }
                 if (!id || seen[id]) {
                     continue;
                 }
                 seen[id] = true;
                 out.push(id);
-                if (note) {
-                    notes[id] = note;
-                }
             }
             return out;
         } catch (e) {
@@ -82,9 +64,7 @@
 
     function save() {
         try {
-            localStorage.setItem(KEY, JSON.stringify(ids.map(function (id) {
-                return { movieId: id, note: notes[id] || null };
-            })));
+            localStorage.setItem(KEY, JSON.stringify(ids));
         } catch (e) {
             // storage unavailable (private mode/quota) — marks live only for this page
         }
@@ -92,20 +72,6 @@
 
     function isMarked(id) {
         return ids.indexOf(id) !== -1;
-    }
-
-    function noteOf(id) {
-        return notes[id] || null;
-    }
-
-    function setLocalNote(id, raw) {
-        var note = raw ? raw.trim().slice(0, NOTE_MAX) : '';
-        if (note) {
-            notes[id] = note;
-        } else {
-            delete notes[id];
-        }
-        save();
     }
 
     // optimistic flip; on a failed mutation the id goes back and the UI re-syncs
@@ -116,8 +82,6 @@
             ids.push(id);
         } else {
             ids.splice(at, 1);
-            // the note belongs to the mark — unmarking removes it
-            delete notes[id];
         }
         if (AUTHENTICATED) {
             persistMark(id, marked);
@@ -169,11 +133,10 @@
             });
     }
 
-    // one-time migration: anonymous marks and notes (this browser's
-    // localStorage) are merged into the account — the server keeps an existing
-    // account note over the local one; localStorage is cleared only after the
-    // server confirmed, so a failed merge keeps everything for the next
-    // attempt (idempotent union)
+    // one-time migration: anonymous marks (this browser's localStorage) are
+    // merged into the account; localStorage is cleared only after the server
+    // confirmed, so a failed merge keeps everything for the next attempt
+    // (idempotent union)
     function migrateLocalMarks() {
         var local = load();
         if (!local.length) {
@@ -184,7 +147,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 movies: local.map(function (id) {
-                    return { movieId: id, note: noteOf(id) };
+                    return { movieId: id };
                 })
             })
         })
@@ -197,8 +160,6 @@
                     localStorage.removeItem(NAME_KEY);
                 } catch (e) {
                 }
-                // the local notes have merged server-side — drop the local copy
-                notes = {};
                 local.forEach(function (id) {
                     if (ids.indexOf(id) === -1) {
                         ids.push(id);
@@ -294,107 +255,12 @@
             el.setAttribute('aria-label', cardMarked ? 'Unmark movie' : 'Mark movie');
         });
         syncListView();
-        syncLocalNotes();
     }
 
-    // anonymous notes are rendered client-side: one note area per marked card
-    // on /list (the anonymous marked list) and a mark-note area on the movie
-    // page — mirroring the server-rendered areas authenticated users get.
-    // A card mid-edit is left alone so focus and typing are never lost
-    function syncLocalNotes() {
-        if (AUTHENTICATED) {
-            return;
-        }
-        if (LIST_PAGE) {
-            Array.prototype.forEach.call(document.querySelectorAll('.movie-cards li[data-movie-id]'), function (li) {
-                var id = Number(li.getAttribute('data-movie-id'));
-                var area = li.querySelector('.card-note');
-                if (!isMarked(id)) {
-                    if (area) {
-                        area.remove();
-                    }
-                    return;
-                }
-                if (li.querySelector('.card-note-form')) {
-                    return;
-                }
-                if (!area) {
-                    area = document.createElement('div');
-                    // the server cards keep the note area inside the details
-                    // row (the grid view tucks it under the bookmark there)
-                    li.querySelector('.card-details').appendChild(area);
-                }
-                fillNoteArea(area, id);
-            });
-        }
-        var button = document.querySelector('[data-mark-button]');
-        var info = button ? button.closest('.movie-info') : null;
-        if (!info) {
-            return;
-        }
-        var id = Number(button.getAttribute('data-movie-id'));
-        var row = info.querySelector('.movie-note');
-        if (!isMarked(id)) {
-            if (row) {
-                row.remove();
-            }
-            return;
-        }
-        if (!row) {
-            row = document.createElement('div');
-            row.className = 'movie-note';
-            info.insertBefore(row, info.querySelector('.movie-playlists-row') || null);
-        }
-        if (!row.querySelector('.card-note-form')) {
-            var area = row.querySelector('.card-note');
-            if (!area) {
-                area = document.createElement('div');
-                row.appendChild(area);
-            }
-            fillNoteArea(area, id);
-        }
-    }
-
-    function fillNoteArea(area, id) {
-        var note = noteOf(id);
-        // the movie page wants its own affordances: plain "+ note" while
-        // empty, the pencil beside a saved note — everywhere else it's
-        // the page icon under the bookmark
-        var onMoviePage = !!area.closest('.movie-note');
-        area.className = 'card-note';
-        area.textContent = '';
-        if (note) {
-            var text = document.createElement('p');
-            text.className = 'card-note-text';
-            text.textContent = note;
-            area.appendChild(text);
-        }
-        var toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'card-note-toggle';
-        toggle.setAttribute('data-local-note', String(id));
-        toggle.setAttribute('aria-label', note ? 'Edit note' : 'Add note');
-        toggle.title = note ? 'Edit note' : 'Add note';
-        if (onMoviePage) {
-            if (note) {
-                toggle.className = 'card-note-toggle has-note note-pencil';
-                toggle.innerHTML = PENCIL_SVG;
-            } else {
-                toggle.textContent = '+ note';
-            }
-        } else {
-            if (note) {
-                toggle.className = 'card-note-toggle has-note';
-            }
-            toggle.innerHTML = PAGE_ICON_SVG;
-        }
-        area.appendChild(toggle);
-    }
-
-    // the shared note fragments always carry the page icon (cards, picker);
-    // the movie page wants plain "+ note" while empty and the pencil beside
-    // a saved note — this re-applies that to any area swapped into the
-    // movie note slot (fresh-mark fetch, save, cancel, boosted navigation)
+    // the note fragments render with the page icon everywhere; the movie
+    // page additionally advertises the `n` hotkey in the label — this
+    // re-applies that to any area swapped into the movie note slot (save,
+    // cancel, boosted navigation)
     function movieNoteAffordance() {
         var row = document.querySelector('.movie-note');
         if (!row) {
@@ -410,91 +276,27 @@
         }
         if (area.querySelector('.card-note-text')) {
             toggle.classList.add('has-note');
-            if (!toggle.classList.contains('note-pencil')) {
-                toggle.classList.add('note-pencil');
-                toggle.innerHTML = PENCIL_SVG;
-            }
+            toggle.setAttribute('aria-label', 'Edit note (n)');
+            toggle.title = 'Edit note (n)';
         } else {
-            toggle.classList.remove('has-note', 'note-pencil');
-            if (toggle.querySelector('svg')) {
-                toggle.textContent = '+ note';
-            }
+            toggle.classList.remove('has-note');
+            toggle.setAttribute('aria-label', 'Add note (n)');
+            toggle.title = 'Add note (n)';
         }
-    }
-
-    // the local twin of the server-rendered editor: same markup, same classes,
-    // but it saves straight into localStorage
-    function openLocalNoteEditor(area, id) {
-        var form = document.createElement('form');
-        form.className = 'card-note card-note-form';
-        form.setAttribute('data-local-note-form', String(id));
-        var textarea = document.createElement('textarea');
-        textarea.name = 'note';
-        textarea.maxLength = NOTE_MAX;
-        textarea.rows = 2;
-        textarea.placeholder = 'Note (optional)';
-        textarea.setAttribute('aria-label', 'Note');
-        textarea.value = noteOf(id) || '';
-        var actions = document.createElement('div');
-        actions.className = 'card-note-actions';
-        var save = document.createElement('button');
-        save.type = 'submit';
-        save.className = 'chip-button';
-        save.textContent = 'Save';
-        var cancel = document.createElement('button');
-        cancel.type = 'button';
-        cancel.className = 'card-note-cancel';
-        cancel.setAttribute('data-note-cancel', '');
-        cancel.setAttribute('aria-label', 'Cancel');
-        cancel.textContent = '✕';
-        actions.appendChild(save);
-        actions.appendChild(cancel);
-        form.appendChild(textarea);
-        form.appendChild(actions);
-        area.replaceWith(form);
-        textarea.focus();
-    }
-
-    // the movie page's note slot is server-rendered for already-marked movies;
-    // a fresh authenticated mark fetches the fragment in, an unmark empties the
-    // slot — anonymous marks get the local builder instead (syncLocalNotes)
-    function syncMovieNote(id) {
-        if (!AUTHENTICATED) {
-            return;
-        }
-        var row = document.querySelector('.movie-note');
-        if (!row) {
-            return;
-        }
-        if (!isMarked(id)) {
-            row.textContent = '';
-            return;
-        }
-        fetch('/marked/' + id + '/note')
-            .then(function (response) {
-                return response.ok ? response.text() : '';
-            })
-            .then(function (html) {
-                if (!html || !isMarked(id) || !row.isConnected) {
-                    return;
-                }
-                row.textContent = '';
-                row.insertAdjacentHTML('afterbegin', html);
-                if (window.htmx) {
-                    window.htmx.process(row);
-                }
-                movieNoteAffordance();
-            })
-            .catch(function () {
-            });
     }
 
     // grid ⇄ rows: the same card markup, a container attribute switches the
-    // layout; the choice is remembered across pages and sessions
+    // layout; the choice is remembered across pages and sessions. A
+    // server-rendered view (the notes page defaults to rows) wins over the
+    // stored preference — only the toggle label syncs, the chip still works
     function applyCardsView() {
         var toggleButton = document.querySelector('[data-view-toggle]');
         var cards = document.querySelector('.movie-cards');
         if (!toggleButton || !cards) {
+            return;
+        }
+        if (cards.getAttribute('data-view')) {
+            setCardsView(toggleButton, cards, cards.getAttribute('data-view') === 'rows');
             return;
         }
         var rows = false;
@@ -593,6 +395,19 @@
         }
     }
 
+    // the narrow-screen ⋯ list menu: close the panel and sync its toggle
+    function closeListMenu() {
+        var open = document.querySelector('.list-actions[data-open]');
+        if (!open) {
+            return;
+        }
+        open.removeAttribute('data-open');
+        var toggle = open.parentElement.querySelector('[data-list-menu]');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    }
+
     // playlists page + picker dialog: fold the create form away, bring the
     // New button back (its focus — the flow continues from there)
     function closeNewPlaylistForm() {
@@ -605,6 +420,26 @@
             newPlaylistButton.hidden = false;
             newPlaylistButton.focus();
         }
+    }
+
+    // playlist page: the description form replaces the description text in
+    // place until saved or cancelled — the text (or its placeholder) starts
+    // the edit too, like the title rename
+    function startDescEdit() {
+        var descForm = document.querySelector('[data-desc-form]');
+        if (!descForm) {
+            return;
+        }
+        var descText = document.querySelector('[data-desc-text]');
+        if (descText) {
+            descText.hidden = true;
+        }
+        var descToggle = document.querySelector('[data-desc-toggle]');
+        if (descToggle) {
+            descToggle.hidden = true;
+        }
+        descForm.hidden = false;
+        descForm.querySelector('textarea').focus();
     }
 
     function syncListUrl() {
@@ -647,12 +482,13 @@
                 }
                 list.insertAdjacentHTML('beforeend', html);
                 // the fragment has no note area; on the marked page the card
-                // needs the mark's own note affordance, fetched in like on the
-                // movie page (a fresh mark has none yet — the bare page icon)
+                // needs the movie's note affordance, fetched in like on the
+                // movie page (the note is detached from the mark — it is
+                // there whether or not the movie stays marked)
                 if (MARKED_PAGE && AUTHENTICATED) {
                     var li = list.querySelector('li[data-movie-id="' + id + '"]');
                     if (li) {
-                        fetch('/marked/' + id + '/note')
+                        fetch('/movies/' + id + '/note')
                             .then(function (response) {
                                 return response.ok ? response.text() : '';
                             })
@@ -781,6 +617,23 @@
         if (!(event.target instanceof Element)) {
             return; // document/text nodes have no closest
         }
+        // narrow screens: the list actions live behind the ⋯ toggle — open/
+        // close it; any other click (a chip inside, or away) closes the panel
+        var listMenuToggle = event.target.closest('[data-list-menu]');
+        if (listMenuToggle) {
+            var listMenu = listMenuToggle.parentElement.querySelector('.list-actions');
+            if (listMenu) {
+                var open = !listMenu.hasAttribute('data-open');
+                if (open) {
+                    listMenu.setAttribute('data-open', '');
+                } else {
+                    listMenu.removeAttribute('data-open');
+                }
+                listMenuToggle.setAttribute('aria-expanded', String(open));
+            }
+            return;
+        }
+        closeListMenu();
         var shareOpener = event.target.closest('[data-dialog="share"]');
         if (shareOpener) {
             renderQr();
@@ -796,29 +649,12 @@
             startNameEdit();
             return;
         }
-        // anonymous local note editing (the authenticated editor is htmx-driven)
-        var localNoteToggle = event.target.closest('[data-local-note]');
-        if (localNoteToggle) {
-            openLocalNoteEditor(localNoteToggle.closest('.card-note'), Number(localNoteToggle.getAttribute('data-local-note')));
-            return;
-        }
-        // the local editor's ✕ restores the display area in place; the htmx
-        // editor's ✕ carries hx-get and is handled by htmx itself
-        var noteCancel = event.target.closest('[data-note-cancel]');
-        if (noteCancel) {
-            var noteForm = noteCancel.closest('.card-note-form');
-            if (noteForm && noteForm.hasAttribute('data-local-note-form')) {
-                var noteArea = document.createElement('div');
-                fillNoteArea(noteArea, Number(noteForm.getAttribute('data-local-note-form')));
-                noteForm.replaceWith(noteArea);
-            }
-            return;
-        }
         var button = event.target.closest('[data-mark-button]');
         if (button) {
             var movieId = Number(button.getAttribute('data-movie-id'));
             toggle(movieId);
-            syncMovieNote(movieId);
+            // the movie note is independent of the mark — the note slot
+            // needs no syncing on mark toggles
             refresh();
             return;
         }
@@ -900,11 +736,9 @@
                 });
                 return;
             }
-            // the anonymous clear drops every visible mark in one write, not one per card
+            // the anonymous clear drops every visible mark in one write, not one per
+            // card — the movie notes are detached, they stay
             var removedIds = visibleCardIds().filter(isMarked);
-            removedIds.forEach(function (id) {
-                delete notes[id];
-            });
             ids = ids.filter(function (id) {
                 return removedIds.indexOf(id) === -1;
             });
@@ -960,20 +794,12 @@
             return;
         }
         // playlist page: the description form replaces the description text
-        // in place until saved or cancelled — same pattern as the rename
-        var descToggle = event.target.closest('[data-desc-toggle]');
+        // in place until saved or cancelled — same pattern as the rename;
+        // the text itself starts the edit too (the placeholder counts as
+        // the text), like the title rename
+        var descToggle = event.target.closest('[data-desc-toggle], .playlist-description');
         if (descToggle) {
-            var descForm = document.querySelector('[data-desc-form]');
-            if (descForm) {
-                var descText = document.querySelector('[data-desc-text]');
-                if (descText) {
-                    descText.hidden = true;
-                }
-                descToggle.hidden = true;
-                descForm.hidden = false;
-                var descInput = descForm.querySelector('textarea');
-                descInput.focus();
-            }
+            startDescEdit();
             return;
         }
         // playlist page: Reorder reveals the per-card move arrows until
@@ -994,22 +820,8 @@
         }
     });
 
-    // the local note editor saves straight into localStorage
-    document.addEventListener('submit', function (event) {
-        if (!(event.target instanceof Element)) {
-            return;
-        }
-        var form = event.target.closest('[data-local-note-form]');
-        if (!form) {
-            return;
-        }
-        event.preventDefault();
-        setLocalNote(Number(form.getAttribute('data-local-note-form')), form.querySelector('textarea').value);
-        refresh();
-    });
-
-    // `m` toggles the displayed movie; physical key code so it also
-    // works on non-Latin keyboard layouts; never while editing text
+    // `m` toggles the displayed movie, `n` edits its note; physical key codes
+    // so they also work on non-Latin keyboard layouts; never while editing text
     document.addEventListener('keydown', function (event) {
         if (!(event.target instanceof Element)) {
             return; // e.g. keydown with nothing focused (target = document)
@@ -1068,9 +880,8 @@
             }
             return;
         }
-        // Escape cancels a note editor (local or htmx) — both editors carry a
-        // [data-note-cancel] ✕: the local one is handled above, the htmx one
-        // GETs the display area back
+        // Escape cancels the htmx note editor — its [data-note-cancel] ✕ GETs
+        // the display area back
         var noteForm = event.target.closest('.card-note-form');
         if (noteForm) {
             if (event.key === 'Escape') {
@@ -1080,11 +891,21 @@
                     noteCancel.click();
                 }
             }
-            // ⌘/Ctrl+Enter saves: a bubbling submit reaches both editors'
-            // handlers — the local storage one and htmx's alike
+            // ⌘/Ctrl+Enter saves: a bubbling submit reaches htmx's handler
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
                 noteForm.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+            }
+            return;
+        }
+        // Escape also closes the narrow-screen ⋯ list menu — but a native
+        // <dialog> open on top takes precedence (Escape closes it)
+        var openListMenu = document.querySelector('.list-actions[data-open]');
+        if (openListMenu && event.key === 'Escape' && !document.querySelector('dialog[open]')) {
+            closeListMenu();
+            var listMenuToggle = openListMenu.parentElement.querySelector('[data-list-menu]');
+            if (listMenuToggle) {
+                listMenuToggle.focus();
             }
             return;
         }
@@ -1100,17 +921,31 @@
             }
             return;
         }
-        if (event.code !== 'KeyM' || event.metaKey || event.ctrlKey || event.altKey) {
+        if (event.metaKey || event.ctrlKey || event.altKey) {
             return;
         }
         var active = document.activeElement;
         if (active && (EDITABLE.test(active.tagName) || active.isContentEditable)) {
             return;
         }
-        var button = document.querySelector('[data-mark-button]');
-        if (button) {
-            event.preventDefault();
-            button.click();
+        // `m` toggles the displayed movie, `n` edits its note — physical key
+        // codes so both also work on non-Latin keyboard layouts; never while
+        // editing text. `n` clicks the movie page's note toggle; once the
+        // editor is open the toggle is gone and the key is a no-op
+        if (event.code === 'KeyM') {
+            var button = document.querySelector('[data-mark-button]');
+            if (button) {
+                event.preventDefault();
+                button.click();
+            }
+            return;
+        }
+        if (event.code === 'KeyN') {
+            var noteToggle = document.querySelector('.movie-note .card-note-toggle');
+            if (noteToggle) {
+                event.preventDefault();
+                noteToggle.click();
+            }
         }
     });
 
@@ -1165,7 +1000,7 @@
         holder.setAttribute('data-share-url', parts[0] + (query ? '?' + query : ''));
     }
 
-    // other tabs: stay in sync with their marks, notes and the list name
+    // other tabs: stay in sync with their marks and the list name
     // (anonymous mode only — authenticated marks have no local counterpart)
     window.addEventListener('storage', function (event) {
         if (AUTHENTICATED) {
@@ -1175,11 +1010,10 @@
             refresh();
             return;
         }
-        if (event.key !== KEY) {
-            return;
+        if (event.key === KEY) {
+            ids = load();
+            refresh();
         }
-        ids = load();
-        refresh();
     });
 
     function reseedFromServer() {
@@ -1241,8 +1075,7 @@
             refresh();
         }
         // a note editor swapped in takes focus straight away — clicking the
-        // toggle already said "edit now" (the local anonymous editor does
-        // the same in openLocalNoteEditor)
+        // toggle already said "edit now"
         var noteEditor = document.querySelector('.card-note-form textarea');
         if (noteEditor) {
             noteEditor.focus();

@@ -28,7 +28,7 @@ class MovieServiceTest {
 
     private static Movie movie(long id) {
         return new Movie(
-            id, "Movie", null, null, null, List.of(), null, null, null, null,
+            id, "Movie", null, null, null, List.of(), null, null, null,
             List.of(), List.of(), List.of(), null, List.of()
         );
     }

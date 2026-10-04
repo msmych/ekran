@@ -12,14 +12,14 @@ class OgVmTest {
 
     private static final Movie MOVIE = new Movie(
         348, "Alien", null, LocalDate.parse("1979-05-25"), 117,
-        List.of("Horror"), 8.2, "In space no one can hear you scream.",
+        List.of("Horror"), "In space no one can hear you scream.",
         URI.create("https://img/poster.jpg"), URI.create("https://img/backdrop.jpg"),
         List.of(), List.of(), List.of(), "en", List.of()
     );
 
     private static final Movie NO_BACKDROP = new Movie(
         9471, "Aliens", null, LocalDate.parse("1986-07-18"), 137,
-        List.of("Action"), 8.1, "This time it's war.",
+        List.of("Action"), "This time it's war.",
         URI.create("https://img/poster.jpg"), null,
         List.of(), List.of(), List.of(), "en", List.of()
     );
@@ -47,7 +47,7 @@ class OgVmTest {
     void longOverviewIsTruncatedAt300Chars() {
         var movie = new Movie(
             1, "Long", null, LocalDate.parse("2000-01-01"), 100,
-            List.of(), 7.0, "x".repeat(500),
+            List.of(), "x".repeat(500),
             null, null, List.of(), List.of(), List.of(), "en", List.of()
         );
         var og = OgVm.movie(MovieDetailVm.of(movie), "https://ekran.uk/movies/1");
@@ -60,7 +60,7 @@ class OgVmTest {
         var movie = new Movie(
             1, "Untitled", null, null, 100,
             List.of(), null, null,
-            null, null, List.of(), List.of(), List.of(), "en", List.of()
+            null, List.of(), List.of(), List.of(), "en", List.of()
         );
         var og = OgVm.movie(MovieDetailVm.of(movie), "https://ekran.uk/movies/1");
 

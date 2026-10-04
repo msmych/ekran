@@ -21,21 +21,31 @@
                        aria-label="Playlist name" required>
                 <button type="submit" class="chip-button">Save</button>
             </form>
-            <div class="list-actions playlist-actions">
-                <button type="button" class="chip-button" data-reorder-toggle th:hidden="${cards.isEmpty()}">Reorder</button>
-                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
-                <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
-                <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
-                      hx-confirm="Delete this playlist? Its movies stay in your marks.">
-                    <button type="submit" class="chip-button danger">Delete</button>
-                </form>
+            <div class="list-menu">
+                <!-- narrow screens: the row of chips becomes this ⋯ dropdown —
+                     one DOM, the breakpoint only changes presentation -->
+                <button type="button" class="chip-button list-menu-toggle" data-list-menu
+                        aria-label="List actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+                <div class="list-actions playlist-actions">
+                    <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
+                    <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
+                    <button type="button" class="chip-button" data-reorder-toggle th:hidden="${cards.isEmpty()}">Reorder</button>
+                    <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
+                    <form method="post" th:action="'/playlists/' + ${id} + '/delete'"
+                          hx-confirm="Delete this playlist? Its movies stay in your marks.">
+                        <button type="submit" class="chip-button danger">Delete</button>
+                    </form>
+                </div>
             </div>
         </div>
-        <!-- optional description, edited in place like the rename: the pencil
-             reveals the form, the text and pencil hide while it is open -->
+<!-- optional description, edited in place like the rename: the pencil
+              reveals the form, the text and pencil hide while it is open; with
+              no description yet a muted placeholder marks the affordance -->
         <div class="playlist-desc">
-            <p class="playlist-description" data-desc-text th:if="${description != null}" th:text="${description}">Description</p>
+            <p class="playlist-description playlist-desc-placeholder" data-desc-text
+               th:if="${description == null}">Add description…</p>
+            <p class="playlist-description" data-desc-text th:if="${description != null}"
+               th:text="${description}">Description</p>
             <button type="button" class="list-name-edit" data-desc-toggle aria-label="Edit description">
                 <th:block th:replace="~{pencil-icon :: icon}"></th:block>
             </button>

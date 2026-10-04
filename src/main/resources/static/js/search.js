@@ -283,18 +283,4 @@
             menu.removeAttribute('open');
         }
     });
-
-    // Cmd+K tip: platform-correct label; document-level so it survives htmx swaps,
-    // and re-applied after each swap (boosted navigation re-inserts the raw template label)
-    function applyKbdLabel() {
-        var kbd = document.getElementById('search-kbd');
-        if (!kbd) {
-            return;
-        }
-        var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-        kbd.textContent = mac ? '⌘K' : 'Ctrl K';
-    }
-
-    applyKbdLabel();
-    document.addEventListener('htmx:afterSwap', applyKbdLabel);
 })();

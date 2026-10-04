@@ -1,20 +1,19 @@
 <!-- the personal note display: the note (when present) plus the edit affordance;
      GET editUrl (hx) swaps this whole area for the note-editor form.
      Rendered directly by the note routes and included whole by the pages.
-     The page icon is the default (cards, picker); the movie page opts into
-     its own affordances via the movieNote flag — plain "+ note" while empty,
-     the rename pencil beside a saved note -->
+     The page icon is the affordance everywhere — a present note turns it
+     accent; the movie page additionally advertises the `n` hotkey in
+     the label -->
 <div class="card-note" xmlns:th="http://www.thymeleaf.org">
     <p class="card-note-text" th:if="${note != null}" th:text="${note}">note</p>
     <button type="button" class="card-note-toggle"
-            th:classappend="${note != null} ? (${movieNote != null} ? 'has-note note-pencil' : 'has-note')"
+            th:with="label=${(note != null ? 'Edit note' : 'Add note') + (movieNote != null ? ' (n)' : '')}"
+            th:classappend="${note != null} ? 'has-note'"
             th:attr="hx-get=${editUrl}"
-            th:aria-label="${note != null} ? 'Edit note' : 'Add note'"
-            th:title="${note != null} ? 'Edit note' : 'Add note'"
+            th:aria-label="${label}"
+            th:title="${label}"
             hx-target="closest .card-note"
             hx-swap="outerHTML">
-        <th:block th:if="${movieNote == null}"><th:block th:replace="~{note-icon :: icon(14)}"></th:block></th:block>
-        <th:block th:if="${movieNote != null and note != null}"><th:block th:replace="~{pencil-icon :: icon}"></th:block></th:block>
-        <th:block th:if="${movieNote != null and note == null}" th:text="'+ note'">+ note</th:block>
+        <th:block th:replace="~{note-icon :: icon(14)}"></th:block>
     </button>
 </div>

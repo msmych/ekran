@@ -11,7 +11,6 @@ public record Movie(
     LocalDate releaseDate,
     Integer runtimeMinutes,
     List<String> genres,
-    Double rating,
     String overview,
     URI posterUrl,
     URI backdropUrl,

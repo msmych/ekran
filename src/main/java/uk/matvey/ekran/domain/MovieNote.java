@@ -1,6 +1,6 @@
 package uk.matvey.ekran.domain;
 
-/** A movie id with an optional personal note — a mark or a playlist membership. */
+/** A movie id with an optional personal note — a movie note or a playlist membership. */
 public record MovieNote(long movieId, String note) {
 
     public MovieNote {

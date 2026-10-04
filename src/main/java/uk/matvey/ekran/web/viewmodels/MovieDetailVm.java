@@ -1,8 +1,8 @@
 package uk.matvey.ekran.web.viewmodels;
 
+import java.net.URI;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import uk.matvey.ekran.domain.Movie;
 import uk.matvey.ekran.domain.MovieVideo;
 
@@ -12,10 +12,10 @@ public record MovieDetailVm(
     String originalTitle,
     Integer year,
     String runtime,
-    String rating,
     String genres,
     String overview,
     String posterUrl,
+    String fullPosterUrl,
     String backdropUrl,
     List<PersonLinkVm> directors,
     List<PersonLinkVm> writers,
@@ -38,10 +38,10 @@ public record MovieDetailVm(
             movie.originalTitle(),
             movie.releaseDate() == null ? null : movie.releaseDate().getYear(),
             runtime(movie.runtimeMinutes()),
-            rating(movie.rating()),
             movie.genres().isEmpty() ? null : String.join(", ", movie.genres()),
             movie.overview(),
             movie.posterUrl() == null ? null : movie.posterUrl().toString(),
+            fullPosterUrl(movie.posterUrl()),
             movie.backdropUrl() == null ? null : movie.backdropUrl().toString(),
             movie.directors().stream().map(d -> PersonLinkVm.of(d, "/directing")).toList(),
             movie.writers().stream().map(w -> PersonLinkVm.of(w, "/writing")).toList(),
@@ -86,10 +86,9 @@ public record MovieDetailVm(
         return "%dh %02dm".formatted(minutes / 60, minutes % 60);
     }
 
-    private static String rating(Double value) {
-        if (value == null || value <= 0) {
-            return null;
-        }
-        return String.format(Locale.ROOT, "%.1f ★", value);
+    // the mapper builds poster URLs at the w342 size (the card width) — the
+    // full-size version in the poster dialog is the same path, bigger segment
+    private static String fullPosterUrl(URI posterUrl) {
+        return posterUrl == null ? null : posterUrl.toString().replace("/w342/", "/original/");
     }
 }
