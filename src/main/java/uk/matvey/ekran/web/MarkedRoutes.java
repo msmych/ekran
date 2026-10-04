@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.web.viewmodels.MovieCardVm;
 
@@ -20,10 +21,12 @@ import uk.matvey.ekran.web.viewmodels.MovieCardVm;
 public class MarkedRoutes extends Routes {
 
     private final MarksService marksService;
+    private final MovieNotesService notesService;
     private final MovieService movieService;
 
-    public MarkedRoutes(MarksService marksService, MovieService movieService) {
+    public MarkedRoutes(MarksService marksService, MovieNotesService notesService, MovieService movieService) {
         this.marksService = marksService;
+        this.notesService = notesService;
         this.movieService = movieService;
     }
 
@@ -35,9 +38,6 @@ public class MarkedRoutes extends Routes {
         app.post("/marked/migrate", this::migrate);
         app.post("/marked/{movieId}", this::mark);
         app.delete("/marked/{movieId}", this::unmark);
-        app.get("/marked/{movieId}/note", this::noteArea);
-        app.get("/marked/{movieId}/note/edit", this::noteEditor);
-        app.post("/marked/{movieId}/note", this::setNote);
         app.post("/marked", this::markAll);
         app.delete("/marked", this::unmarkAll);
     }
@@ -48,17 +48,13 @@ public class MarkedRoutes extends Routes {
             redirectToSignin(ctx, "/marked");
             return;
         }
-        var marked = marksService.markedMovies(userId);
         // one TMDB call per card — the same cap as /list keeps the page bounded
-        var ids = marked.stream().map(MovieNote::movieId).limit(MovieIds.MAX_SET).toList();
+        var ids = marksService.markedMovieIds(userId).stream().limit(MovieIds.MAX_SET).toList();
         var cards = movieService.findByIds(ids).stream().map(MovieCardVm::of).toList();
-        var markNotes = new HashMap<Long, String>();
-        marked.stream().limit(MovieIds.MAX_SET).forEach(m -> {
-            if (m.note() != null) {
-                markNotes.put(m.movieId(), m.note());
-            }
-        });
-        ctx.render("marked", Map.of("cards", cards, "movieIds", ids, "markNotes", markNotes));
+        // the cards carry the user's movie notes — notes are detached from marks,
+        // they survive unmarking and moving marks into playlists
+        var movieNotes = new HashMap<>(notesService.notes(userId, ids));
+        ctx.render("marked", Map.of("cards", cards, "movieIds", ids, "movieNotes", movieNotes));
     }
 
     // lightweight reseed for JS after bfcache restores and the like
@@ -86,52 +82,9 @@ public class MarkedRoutes extends Routes {
         ctx.status(204);
     }
 
-    // the inline note editor pair: GET /note renders the display area (the ✕
-    // cancel target), GET /note/edit swaps it into the form, POST saves and
-    // renders the display area back — every exit is an in-place swap
-    private void noteArea(Context ctx) {
-        var userId = requireUser(ctx);
-        var movieId = movieId(ctx);
-        if (movieId == null) {
-            ctx.status(400);
-            return;
-        }
-        renderNoteArea(ctx, marksService.markNote(userId, movieId), editUrl(movieId));
-    }
-
-    private void noteEditor(Context ctx) {
-        var userId = requireUser(ctx);
-        var movieId = movieId(ctx);
-        if (movieId == null) {
-            ctx.status(400);
-            return;
-        }
-        renderNoteEditor(ctx, marksService.markNote(userId, movieId), noteUrl(movieId));
-    }
-
-    private void setNote(Context ctx) {
-        var userId = requireUser(ctx);
-        var movieId = movieId(ctx);
-        if (movieId == null) {
-            ctx.status(400);
-            return;
-        }
-        var note = MovieNote.normalize(ctx.formParam("note"));
-        if (!MarksService.validNote(note)) {
-            ctx.status(400);
-            return;
-        }
-        // the note belongs to the mark: without a mark there is nothing to annotate
-        if (!marksService.setMarkNote(userId, movieId, note)) {
-            ctx.status(404);
-            return;
-        }
-        renderNoteArea(ctx, note, editUrl(movieId));
-    }
-
-    // the anonymous → authenticated migration: {movies: [{movieId, note}]}; ids
-    // are marked additively and a note is only written for newly created marks
-    // — an existing server-side note always wins
+    // the anonymous → authenticated migration: {movies: [{movieId, note}]}.
+    // Marks merge additively; notes merge independently — an existing
+    // server-side note always wins over the local (browser) one
     private void migrate(Context ctx) {
         var userId = requireUser(ctx);
         MigrateRequest request;
@@ -150,25 +103,13 @@ public class MarkedRoutes extends Routes {
             .filter(m -> m.movieId() != null && MovieIds.isValid(Long.toString(m.movieId())))
             .map(m -> new MovieNote(m.movieId(), m.note()))
             .toList();
-        if (movies.stream().anyMatch(m -> !MarksService.validNote(m.note()))) {
+        if (movies.stream().anyMatch(m -> !MovieNotesService.validNote(m.note()))) {
             ctx.status(400);
             return;
         }
-        marksService.mergeMarks(userId, movies);
+        marksService.markAll(userId, movies.stream().map(MovieNote::movieId).toList());
+        notesService.mergeNotes(userId, movies);
         ctx.status(204);
-    }
-
-    private static String noteUrl(long movieId) {
-        return "/marked/" + movieId + "/note";
-    }
-
-    private static String editUrl(long movieId) {
-        return noteUrl(movieId) + "/edit";
-    }
-
-    private static Long movieId(Context ctx) {
-        var raw = ctx.pathParam("movieId");
-        return MovieIds.isValid(raw) ? Long.parseLong(raw) : null;
     }
 
     private void markAll(Context ctx) {

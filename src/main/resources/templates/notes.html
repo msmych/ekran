@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{head :: head('Notes — ekran')}"></head>
+<body>
+<div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<main class="wrap" hx-boost="true" hx-indicator="#topbar">
+    <div th:replace="~{header :: header(false)}"></div>
+    <section class="marked-list">
+        <div class="list-head">
+            <h2>Notes</h2>
+            <div class="list-menu">
+                <!-- narrow screens: the row of chips becomes this ⋯ dropdown —
+                     one DOM, the breakpoint only changes presentation -->
+                <button type="button" class="chip-button list-menu-toggle" data-list-menu
+                        aria-label="List actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+                <div class="list-actions">
+                    <button type="button" class="chip-button" data-view-toggle aria-pressed="true">Grid</button>
+                </div>
+            </div>
+        </div>
+        <!-- notes read best as rows — the server renders the rows view and
+             marked.js keeps its hands off a server-rendered view (the chip
+             still toggles, the choice still persists) -->
+        <ul class="movie-cards" data-view="rows">
+            <th:block th:each="c : ${cards}">
+                <li th:replace="~{movie-card :: card(${c}, null, ${movieNotes[c.tmdbId()]}, '/movies/' + ${c.tmdbId()} + '/note/edit')}"></li>
+            </th:block>
+        </ul>
+        <div class="empty-list" th:hidden="${!cards.isEmpty()}">
+            <p>No notes yet.</p>
+            <p>Open a movie and press n — or its + note button — to jot one down.</p>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{footer :: footer}"></footer>
+</body>
+</html>

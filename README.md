@@ -100,8 +100,9 @@ shows the email and a sign-out button (logout deletes the server-side session).
 | `/list/card?movie={id}` | HTMX-only single-card fragment (used when marking from the search overlay while viewing `/list`) |
 | `/signin` · `/signin/sent` · `/auth/link?token=…` | Passwordless email sign-in (magic link) |
 | `/marked` | Signed-in: your marked movies (server-persisted). The header `Marked · N` points here instead of `/list` |
-| `/marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` · `POST /marked/migrate` | Mark sync endpoints (authed; bulk POST is the idempotent local→server merge, migrate is the JSON sign-in migration with notes) |
-| `/marked/{movieId}/note[/edit]` · `/playlists/{id}/movies/{movieId}/note[/edit]` | Mark/membership note display + editor fragments (htmx, ≤500 chars) |
+| `/notes` | Signed-in: all your noted movies, rows view by default (`Notes · N` in the account menu) |
+| `/marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` · `POST /marked/migrate` | Mark sync endpoints (authed; bulk POST is the idempotent local→server merge, migrate is the JSON sign-in migration — bare movie ids today, a legacy `note` field still merges) |
+| `/movies/{movieId}/note[/edit]` · `/playlists/{id}/movies/{movieId}/note[/edit]` | Movie/membership note display + editor fragments (htmx, ≤500 chars) |
 | `/playlists` · `/playlists/{id}` | Signed-in playlist index and detail (description, rename/delete/Share/Print) |
 | `/playlists/select?movie={id}…` · `/playlists/{id}/movies…` | HTMX fragment for the "Add to playlist" dialog + membership mutations |
 | `/account` | Minimal account page (email + sign out) |
@@ -186,10 +187,11 @@ Search-as-you-type is HTMX with a 100 ms debounce and `hx-sync="this: replace"` 
 in-flight request and replaces it, so stale responses can't overwrite newer results and the
 final typed state always fires).
 
-The search bar is on every page (shared `searchbar.html` fragment) with a `⌘K` tip badge
+The search bar is on every page (shared `searchbar.html` fragment) with a `/` tip badge
 (non-home pages only — the home input is already focused and prominent).
-On the homepage it searches live in place; on every other page it's a compact input tucked
-top-right that drops a results overlay below it (Wikipedia-style) — Escape or click-away
+On the homepage it searches live in place; on every other page it's a compact input centered
+in the header (logo left, Account/Sign in in the right corner) that drops a results overlay
+below it (Wikipedia-style) — Escape or click-away
 closes it and you stay where you were. `/` or Cmd/Ctrl+K focuses it from anywhere; results
 are navigable with `↑`/`↓` (or Ctrl N/P) and Enter opens the highlighted one. An
 [about page](/about) is linked from the footer. App JavaScript is just vendored
@@ -199,18 +201,29 @@ Escape, click-away, keyboard nav) and a ~660-line `marked.js` (marking + share/Q
 Movies can be **marked** via the bookmark toggle on the movie page, on any movie card, or
 straight from search results (`m` works too). Anonymous marks live in `localStorage` only;
 signed-in marks live in PostgreSQL (`marked_movies`, migrated from localStorage on first
-authenticated load — additive and idempotent, mark notes included). A mark can carry an
-optional personal note (≤500 chars): a small page-icon toggle sits flush under the
-bookmark on cards and in the playlist picker; the movie page shows a plain `+ note`
-under the mark toggle, swapping to the pencil beside a saved note; on cards a present
-note turns the page icon accent (still outlined), its tooltip reading Edit note. The
-note itself reads muted next to the affordance. The inline editor takes focus on open; ⌘/Ctrl+Enter
-saves, Escape cancels. Anonymous notes stay in `localStorage`; shared URLs never contain
-notes. The header shows `Marked · N` (hidden
+authenticated load — additive and idempotent). Marks are the quick inbox — a bare set of
+movie ids, no notes attached.
+
+**Movie notes** (≤500 chars, `movie_notes` in PostgreSQL, signed-in only — anonymous
+visitors get no note affordance) are detached from marks: noting needs no mark, unmarking
+never deletes the note, and moving marks into playlists never carries it away. The `n`
+hotkey edits the note of the movie being viewed (like `m`, ignored while editing text).
+A small
+page-icon toggle sits flush under the bookmark on cards and in the playlist picker; the
+movie page shows a plain `+ note` under the mark toggle — always, marked or not —
+swapping to the pencil beside a saved note; on cards a present note turns the page icon
+accent (still outlined), its tooltip reading Edit note. The note itself reads muted next
+to the affordance. The inline editor takes focus on open; ⌘/Ctrl+Enter
+saves, Escape cancels. Shared URLs never contain notes. The account menu's `Notes · N`
+row opens the `/notes` page — every noted movie in one place, rows view by default.
+The header shows `Marked · N`, its label led by a bookmark glyph in both the header
+link and the account-menu one (hidden
 until your first mark): for anonymous users it opens `/list?movie=…` (the URL *is* the
 list — share it as-is or via the QR dialog, print it with original titles and directors,
 clear it after a confirm); for signed-in users it opens `/marked` (Share/Print/Clear
-there).
+there). On narrow screens the list pages' action chips fold into a `⋯`
+dropdown next to the title (Escape or click-away closes it; wide screens keep
+the chips inline — same DOM, the 640px breakpoint only changes presentation).
 
 A shared URL opened elsewhere reads "Shared list" with an "Add all to marked" button — it
 never imports silently (for signed-in users that button persists the bulk via the server).
@@ -219,9 +232,10 @@ Signed-in users can also group movies into **playlists** (`playlists` + `playlis
 in PostgreSQL, ordered by insert position): the `Add to playlist` dialog on movie pages
 and lists lets them create playlists, toggle membership, or bulk-add the whole shared
 list. Playlists are ownership-scoped (another user's playlist behaves as 404); membership
-is independent of marks — the marked page's **Move all to playlist** *moves*: each new
-membership inherits the mark's note, then the marks clear (marks are the staging inbox,
-playlists the destination); the movie-page dialog and shared lists stay a copy. A
+is independent of marks — the marked page's **Move all to playlist** *moves*: the marks
+clear (marks are the staging inbox, playlists the destination), the new memberships start
+bare — playlist notes are written deliberately, never inherited, and the user's movie
+notes stay on the movie pages; the movie-page dialog and shared lists stay a copy. A
 playlist can carry an optional description (≤1000 chars), and each membership an
 optional per-playlist note — both edited in place. A playlist's Share link is just `/list?movie=…&name=…`, so it
 renders for anyone, no account needed.

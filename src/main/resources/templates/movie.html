@@ -27,11 +27,12 @@
                         <th:block th:replace="~{bookmark-icon :: icon(18)}"></th:block>
                     </button>
                 </div>
-                <!-- the mark's own note — independent from any playlist membership note;
-                     anonymous users get the same affordance client-side (local storage);
-                     the slot always renders so a fresh mark can drop the fragment in
-                     (:empty hides it while unmarked) -->
-                <div class="movie-note"><th:block th:if="${marked}" th:with="note=${markNote}, editUrl='/marked/' + ${vm.tmdbId()} + '/note/edit', movieNote=true"><div th:replace="~{note-area}"></div></th:block></div>
+<!-- the user's note on the movie — its own thing, independent of the mark
+                     (marks are the bare inbox): noting needs no mark, unmarking and
+                     moving marks into playlists never touch it. Notes are a
+                     signed-in feature: the slot renders only then (:empty hides
+                     it from anonymous visitors) -->
+                <div class="movie-note"><th:block th:if="${userId != null}" th:with="note=${movieNote}, editUrl='/movies/' + ${vm.tmdbId()} + '/note/edit', movieNote=true"><div th:replace="~{note-area}"></div></th:block></div>
                 <div class="movie-playlists-row">
                     <div th:replace="~{playlist-chips :: chips(${memberships}, ${vm.tmdbId()}, false)}"></div>
                 </div>

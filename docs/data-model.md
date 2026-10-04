@@ -83,7 +83,9 @@ Templates bind to view models only, never domain records directly, so display fo
 **Landed first (auth + user data):** `users`, `login_tokens` (SHA-256-hashed, TTL, single-use), `sessions` (the session id column stores a hash of the cookie value — see `configuration-and-ops.md`), plus the marked/playlist tables:
 
 ```sql
-marked_movies   -- user_id, movie_id (tmdb), note (≤500, nullable), created_at;
+marked_movies   -- user_id, movie_id (tmdb), created_at;
+                  PK (user_id, movie_id)
+movie_notes     -- user_id, movie_id (tmdb), note (≤500), updated_at;
                   PK (user_id, movie_id)
 playlists       -- id, user_id, name (≤60, not unique), description (≤1000, nullable),
                   created_at, updated_at; indexed by user_id
@@ -94,7 +96,7 @@ playlist_movies -- playlist_id, movie_id (tmdb), note (≤500, nullable),
 
 Movie references are TMDB IDs stored directly (`BIGINT`) — no local movies table yet, so marks/playlists are verified only by format (`[1-9][0-9]{0,9}`), resolved through TMDB at render time. All queries are scoped by `user_id` from the session; a foreign playlist id is a 404, not a leak.
 
-Notes (mark notes, playlist descriptions, per-membership notes) are trimmed on write, blank → NULL, and are private per-user data — they never appear in shared `/list?…` URLs (the share URL carries only movie ids + the list name). Re-adding an existing membership never overwrites its note or position (`ON CONFLICT (playlist_id, movie_id) DO NOTHING`). Composing a playlist from marks copies each card's mark note into the new membership; the marks themselves (and their notes) stay put.
+Notes are detached from marks: **movie notes** (`movie_notes`) are the user's annotation of a movie — noting needs no mark, unmarking and moving marks into playlists never touch them (V7 migrated the former `marked_movies.note` column into the table and dropped it). Notes are a signed-in feature — there is no anonymous local-note storage anymore. The `/notes` page lists every movie with a note (`notedMovies(userId)`, capped at 100 like every card surface). Notes (movie notes, playlist descriptions, per-membership notes) are trimmed on write, blank → NULL (the `movie_notes` row is deleted), and are private per-user data — they never appear in shared `/list?…` URLs (the share URL carries only movie ids + the list name). Re-adding an existing membership never overwrites its note or position (`ON CONFLICT (playlist_id, movie_id) DO NOTHING`). Composing a playlist from marks never copies notes — new memberships start bare; playlist annotation is a deliberate act done in the playlist itself.
 
 The repository boundary above is designed so the knowledge base lands later without touching `service/` or `web/`. Intended schema:
 

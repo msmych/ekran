@@ -30,6 +30,8 @@ import uk.matvey.ekran.domain.SearchType;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
 import uk.matvey.ekran.marks.InMemoryMarksRepository;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.InMemoryMovieNotesRepository;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.playlists.InMemoryPlaylistsRepository;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.repository.MovieRepository;
@@ -130,7 +132,7 @@ class RoutesTest {
                 var body = http.get(path).body().string();
                 assertThat(body).contains("src=\"/js/search.js\"");
                 assertThat(body).contains("href=\"/about\"");
-                // Cmd+K tip badge only on the compact overlay search
+                // `/` tip badge only on the compact overlay search
                 assertThat(body).contains("id=\"search-kbd\"");
             }
             // home: no tip badge — the input is already focused and prominent
@@ -144,7 +146,6 @@ class RoutesTest {
             assertThat(js).contains("code === 'KeyK'");
             assertThat(js).contains("i.blur()");
             assertThat(js).contains("ArrowDown");
-            assertThat(js).contains("'Ctrl K'");
         });
     }
 
@@ -683,9 +684,10 @@ class RoutesTest {
                 // which sent stale mark lists on click (bug seen in prod)
                 var body = http.get(path).body().string();
                 assertThat(body).contains("data-marked-link");
-                assertThat(body).contains("hx-boost=\"false\">Marked");
+                // the bookmark glyph leads the label
+                assertThat(body).contains("M3.5 1.5h9a1 1 0 0 1 1 1v12l-5.5-3.7");
+                assertThat(body).contains("Marked · <span data-marked-count>");
                 assertThat(body).doesNotContain("data-marked-link hidden");
-                assertThat(body).contains("data-marked-count");
             }
         });
     }
@@ -907,6 +909,7 @@ assertThat(body).contains("href=\"/movies/348\"");
                 false,
                 Clock.systemUTC()),
             new MarksService(new InMemoryMarksRepository()),
+            new MovieNotesService(new InMemoryMovieNotesRepository()),
             new PlaylistsService(new InMemoryPlaylistsRepository()),
             true,
             null

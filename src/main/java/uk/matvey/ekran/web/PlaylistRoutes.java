@@ -11,6 +11,7 @@ import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.playlists.PlaylistDetail;
 import uk.matvey.ekran.playlists.PlaylistMembership;
 import uk.matvey.ekran.playlists.PlaylistsService;
@@ -108,9 +109,10 @@ public class PlaylistRoutes extends Routes {
         }
     }
 
-    // composing a playlist out of marked movies is a move: each membership
-    // inherits the mark's note first, then the marks are cleared — marks are
-    // the staging inbox, playlists the curated destination; from shared
+    // composing a playlist out of marked movies is a move: the marks clear —
+    // marks are the staging inbox, playlists the curated destination. The new
+    // memberships start bare: playlist notes are written deliberately, and the
+    // user's movie notes stay on the movie pages either way. From shared
     // lists (no move flag) it stays a copy
     private void create(Context ctx) {
         var userId = requireUser(ctx);
@@ -127,7 +129,7 @@ public class PlaylistRoutes extends Routes {
         var movieIds = MovieIds.validOf(ctx.formParams("movie"));
         var move = isMove(ctx);
         // one transaction: the playlist is created with its movies or not at all
-        var id = playlistsService.createPlaylist(userId, name.get(), description, withMarkNotes(userId, movieIds));
+        var id = playlistsService.createPlaylist(userId, name.get(), description, bareNotes(movieIds));
         if (move) {
             marksService.unmarkAll(userId, movieIds);
         }
@@ -186,7 +188,7 @@ public class PlaylistRoutes extends Routes {
         var id = parseId(ctx);
         var movieIds = MovieIds.validOf(ctx.formParams("movie"));
         var move = isMove(ctx);
-        playlistsService.addMovies(userId, id, withMarkNotes(userId, movieIds));
+        playlistsService.addMovies(userId, id, bareNotes(movieIds));
         if (move) {
             marksService.unmarkAll(userId, movieIds);
         }
@@ -246,7 +248,7 @@ public class PlaylistRoutes extends Routes {
         var id = parseId(ctx);
         var movieId = movieId(ctx);
         var note = MovieNote.normalize(ctx.formParam("note"));
-        if (!MarksService.validNote(note)) {
+        if (!MovieNotesService.validNote(note)) {
             ctx.status(400);
             return;
         }
@@ -331,16 +333,10 @@ public class PlaylistRoutes extends Routes {
         return "Created " + name + " with " + movieIds.size() + movies + (move ? " — marks cleared" : "");
     }
 
-    // new memberships carry the movie's mark note; with move-all the marks are
-    // cleared right after — the notes live on in the memberships
-    private List<MovieNote> withMarkNotes(long userId, List<Long> movieIds) {
-        var markNotes = new HashMap<Long, String>();
-        marksService.markedMovies(userId).forEach(m -> {
-            if (m.note() != null) {
-                markNotes.put(m.movieId(), m.note());
-            }
-        });
-        return movieIds.stream().map(id -> new MovieNote(id, markNotes.get(id))).toList();
+    // new memberships carry no note: playlist annotation is deliberate, done in
+    // the playlist itself (the user's movie notes stay on the movie pages)
+    private static List<MovieNote> bareNotes(List<Long> movieIds) {
+        return movieIds.stream().map(id -> new MovieNote(id, null)).toList();
     }
 
     // a description is optional: absent/blank means none; only too long is invalid

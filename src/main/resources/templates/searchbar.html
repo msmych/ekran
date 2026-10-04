@@ -18,9 +18,10 @@
                         hx-include=${live} ? '#search-type',
                         autofocus=${live} ? 'autofocus' : null">
         <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
-        <!-- Cmd+K tip only on the compact overlay search — the home input is
-             already focused and prominent, there is nothing to advertise -->
-        <span class="search-kbd" id="search-kbd" aria-hidden="true" th:if="${!live}">⌘K</span>
+        <!-- `/` tip only on the compact overlay search — the home input is
+             already focused and prominent, there is nothing to advertise;
+             Cmd/Ctrl+K focuses it too, but `/` is the advertised shortcut -->
+        <span class="search-kbd" id="search-kbd" aria-hidden="true" th:if="${!live}">/</span>
         <!-- movies/people toggle: search.js flips the hidden input's value, re-applies the
              active state and re-fires the search through the input's `search` trigger -->
         <input type="hidden" id="search-type" name="type"

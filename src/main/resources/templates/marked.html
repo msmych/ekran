@@ -9,21 +9,29 @@
     <section class="marked-list">
         <div class="list-head">
             <h2>Marked movies</h2>
-            <div class="list-actions">
-                <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
-                <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
-                <button type="button" class="chip-button" th:if="${!cards.isEmpty()}"
-                        data-dialog="playlist-select"
-                        th:attr="hx-get=@{/playlists/select(movie=${movieIds}, move=true)}"
-                        hx-target="#playlist-select-body"
-                        hx-swap="innerHTML">Move all to playlist</button>
-                <button type="button" class="chip-button" data-clear-marks th:hidden="${cards.isEmpty()}">Clear all</button>
-                <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
+            <div class="list-menu">
+                <!-- narrow screens: the row of chips becomes this ⋯ dropdown —
+                     one DOM, the breakpoint only changes presentation -->
+                <button type="button" class="chip-button list-menu-toggle" data-list-menu
+                        aria-label="List actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+                <div class="list-actions">
+                    <button type="button" class="chip-button" data-dialog="share" th:hidden="${cards.isEmpty()}">Share</button>
+                    <button type="button" class="chip-button" data-print-list th:hidden="${cards.isEmpty()}">Print</button>
+                    <button type="button" class="chip-button" th:if="${!cards.isEmpty()}"
+                            data-dialog="playlist-select"
+                            th:attr="hx-get=@{/playlists/select(movie=${movieIds}, move=true)}"
+                            hx-target="#playlist-select-body"
+                            hx-swap="innerHTML">Move all to playlist</button>
+                    <button type="button" class="chip-button" data-view-toggle aria-pressed="false">Rows</button>
+                    <button type="button" class="chip-button" data-clear-marks th:hidden="${cards.isEmpty()}">Clear all</button>
+                </div>
             </div>
         </div>
         <ul class="movie-cards">
             <th:block th:each="c : ${cards}">
-                <li th:replace="~{movie-card :: card(${c}, null, ${markNotes[c.tmdbId()]}, '/marked/' + ${c.tmdbId()} + '/note/edit')}"></li>
+                <!-- the card carries the user's movie note — notes are detached
+                     from marks, they live regardless of mark state -->
+                <li th:replace="~{movie-card :: card(${c}, null, ${movieNotes[c.tmdbId()]}, '/movies/' + ${c.tmdbId()} + '/note/edit')}"></li>
             </th:block>
         </ul>
         <div class="empty-list" th:hidden="${!cards.isEmpty()}">

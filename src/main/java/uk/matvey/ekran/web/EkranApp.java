@@ -20,6 +20,7 @@ import uk.matvey.ekran.domain.NotFoundException;
 import uk.matvey.ekran.domain.TmdbAuthException;
 import uk.matvey.ekran.domain.TmdbUnavailableException;
 import uk.matvey.ekran.marks.MarksService;
+import uk.matvey.ekran.notes.MovieNotesService;
 import uk.matvey.ekran.playlists.PlaylistsService;
 import uk.matvey.ekran.service.MovieService;
 import uk.matvey.ekran.service.PersonService;
@@ -40,6 +41,7 @@ public final class EkranApp {
         PersonService personService,
         AuthService authService,
         MarksService marksService,
+        MovieNotesService notesService,
         PlaylistsService playlistsService,
         boolean secureCookies,
         DataSource dataSource
@@ -68,13 +70,14 @@ public final class EkranApp {
         // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
         // and serves stale JS after deploys — mismatched markup/JS versions follow)
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
-        app.before(ctx -> resolveCurrentUser(ctx, authService, marksService, playlistsService));
+        app.before(ctx -> resolveCurrentUser(ctx, authService, marksService, notesService, playlistsService));
         new SearchRoutes(searchService).register(app);
-        new MovieRoutes(movieService, playlistsService, marksService).register(app);
+        new MovieRoutes(movieService, playlistsService, marksService, notesService).register(app);
         new PersonRoutes(personService).register(app);
         new ListRoutes(movieService).register(app);
         new AuthRoutes(authService, secureCookies).register(app);
-        new MarkedRoutes(marksService, movieService).register(app);
+        new MarkedRoutes(marksService, notesService, movieService).register(app);
+        new NotesRoutes(notesService, movieService).register(app);
         new PlaylistRoutes(playlistsService, movieService, marksService).register(app);
         app.get("/about", ctx -> ctx.render("about"));
         app.get("/videos/{key}", ctx -> {
@@ -104,11 +107,12 @@ public final class EkranApp {
             merged.put("userId", ctx.<Long>attribute("userId"));
             merged.put("markedIdsCsv", ctx.<String>attribute("markedIdsCsv"));
             merged.put("playlistsCount", ctx.<Long>attribute("playlistsCount"));
+            merged.put("notesCount", ctx.<Long>attribute("notesCount"));
             return delegate.render(filePath, merged, ctx);
         };
     }
 
-    private static void resolveCurrentUser(Context ctx, AuthService authService, MarksService marksService, PlaylistsService playlistsService) {
+    private static void resolveCurrentUser(Context ctx, AuthService authService, MarksService marksService, MovieNotesService notesService, PlaylistsService playlistsService) {
         var uri = ctx.req().getRequestURI();
         var query = ctx.req().getQueryString();
         // the sign-in/sign-out continuation: the plain path — except on /list,
@@ -126,6 +130,7 @@ public final class EkranApp {
                     .map(String::valueOf)
                     .collect(Collectors.joining(",")));
                 ctx.attribute("playlistsCount", playlistsService.playlistsCount(user.userId()));
+                ctx.attribute("notesCount", notesService.notesCount(user.userId()));
             });
         }
     }
