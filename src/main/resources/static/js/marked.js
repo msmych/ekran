@@ -211,15 +211,18 @@
         return name ? '/list?' + qs + '&name=' + encodeURIComponent(name) : '/list?' + qs;
     }
 
-    // the shareable snapshot of the current set: a dialog may carry its own
-    // data-share-url (the playlist page shares its /list URL); on /marked that is
-    // the /list URL built from the ids (the /marked URL itself carries no state);
-    // on /list the URL already mirrors the view, so it shares itself
+    // the shareable snapshot of the current set: the #share dialog may carry its
+// own data-share-url (the playlist page shares its /list URL; a row-level
+// opener copies its URL onto the dialog before opening); on /marked that is
+// the /list URL built from the ids (the /marked URL itself carries no state);
+// on /list the URL already mirrors the view, so it shares itself
     function shareUrl() {
-        var explicit = document.querySelector('[data-share-url]');
-        if (explicit) {
-            var url = explicit.getAttribute('data-share-url');
-            return url && url.charAt(0) === '/' ? location.origin + url : url;
+        var dialog = document.getElementById('share');
+        if (dialog) {
+            var url = dialog.getAttribute('data-share-url');
+            if (url) {
+                return url.charAt(0) === '/' ? location.origin + url : url;
+            }
         }
         return MARKED_PAGE ? location.origin + listUrl() : location.href;
     }
@@ -636,6 +639,15 @@
         closeListMenu();
         var shareOpener = event.target.closest('[data-dialog="share"]');
         if (shareOpener) {
+            // a row-level opener (the playlists index) carries its own URL —
+            // copy it onto the dialog so the QR and the copy encode this row
+            var rowUrl = shareOpener.getAttribute('data-share-url');
+            if (rowUrl) {
+                var dialog = document.getElementById('share');
+                if (dialog) {
+                    dialog.setAttribute('data-share-url', rowUrl);
+                }
+            }
             renderQr();
             return;
         }
@@ -985,7 +997,7 @@
     // the playlist page's share URL is the playlist's /list snapshot — its
     // movie params must follow the live card order
     function syncReorderedShareUrl() {
-        var holder = document.querySelector('[data-share-url]');
+        var holder = document.getElementById('share');
         if (!holder) {
             return;
         }

@@ -440,8 +440,16 @@ body {
     display: none;
 }
 
-.site-search:focus-within .search-overlay:not(:empty) {
+/* the panel carries the type toggle at its top, so it opens on plain focus —
+   the Movies/People pills are discoverable before any results exist; the
+   blank-query response keeps #overlay-results empty (just the pills show) */
+.site-search:focus-within .search-overlay {
     display: block;
+}
+
+/* overlay toggle: same pill pair as home, tucked into the panel top */
+.search-overlay .search-toggle {
+    margin: 0 0 6px;
 }
 
 /* mobile blur race: a tap blurs the input before the click is synthesized —
@@ -1501,47 +1509,68 @@ kbd {
 
 .playlist-picker {
     list-style: none;
-    margin: 12px 16px;
+    margin: 8px 16px 4px;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+}
+
+/* rows, not input-like boxes: the same hairline-row look as the playlists
+   index — the membership note is part of the row, tucked under the name */
+.playlist-picker li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
 }
 
 .playlist-picker .pick {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    padding: 0;
+    border: none;
     background: none;
+    font-family: inherit;
     font-size: 14px;
     color: var(--text);
     cursor: pointer;
     text-align: left;
 }
 
-.playlist-picker .pick:hover {
-    border-color: var(--accent);
+.playlist-picker .pick:hover .pick-name,
+.playlist-picker .pick:hover .pick-add {
     color: var(--accent);
-}
-
-.playlist-picker .pick.on {
-    border-color: var(--text);
-    background: var(--bg);
 }
 
 .playlist-picker .pick-mark {
     color: var(--accent);
+    flex-shrink: 0;
 }
 
 .playlist-picker .pick-mark svg {
     display: block;
 }
 
+/* addable rows carry a muted + on the right — the box affordance is gone,
+   the mark mirrors the index rows' right-side quick action */
+.playlist-picker .pick-add {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.playlist-picker .pick-note .card-note {
+    margin: 0;
+}
+
 .playlist-picker .pick-empty {
+    padding: 4px 0;
+    border-bottom: none;
     font-size: 13px;
     color: var(--muted);
 }
@@ -1601,12 +1630,28 @@ kbd {
 }
 
 .playlist-index a {
+    text-decoration: none;
+    color: var(--text);
+}
+
+.playlist-index .playlist-row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 12px;
     padding: 10px 4px;
     border-bottom: 1px solid var(--border);
-    text-decoration: none;
+}
+
+.playlist-index .playlist-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.playlist-index .playlist-row-main .playlist-name {
     color: var(--text);
 }
 
@@ -1614,10 +1659,35 @@ kbd {
     color: var(--accent);
 }
 
+.playlist-index .playlist-row-desc {
+    font-size: 13px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playlist-index .playlist-row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 .playlist-index .playlist-count {
     font-size: 13px;
     color: var(--muted);
     white-space: nowrap;
+}
+
+/* narrow screens: quick actions tuck under the row instead of squeezing it */
+@media (max-width: 640px) {
+    .playlist-index .playlist-row {
+        flex-wrap: wrap;
+    }
+
+    .playlist-index .playlist-row-actions {
+        flex-wrap: wrap;
+    }
 }
 
 .playlist-new-form,
@@ -1769,17 +1839,6 @@ kbd {
 
 .movie-note .card-note-form textarea {
     font-size: 13px;
-}
-
-/* picker dialog: each member row carries its membership note underneath */
-.playlist-picker li {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.playlist-picker .pick-note .card-note {
-    margin: 0;
 }
 
 /* playlist page: the optional description under the title, edited in place

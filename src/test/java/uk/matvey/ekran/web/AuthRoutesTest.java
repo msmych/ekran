@@ -494,6 +494,48 @@ class AuthRoutesTest {
     }
 
     @Test
+    void playlistsIndexShowsDescriptionsAndQuickActions() {
+        authTest((server, http) -> {
+            var sessionId = signIn(http, "curator@bar.com");
+
+            // empty playlist: Share is hidden, Delete is wired
+            var emptyCreate = http.request("/playlists", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder().add("name", "Empty").build());
+            });
+            var emptyId = emptyCreate.header("Location").substring("/playlists/".length());
+
+            var filledCreate = http.request("/playlists", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(new FormBody.Builder()
+                    .add("name", "Space westerns")
+                    .add("description", "Cowboys in orbit")
+                    .build());
+            });
+            var filledId = filledCreate.header("Location").substring("/playlists/".length());
+            // one movie in: the Share row button carries its id in the snapshot URL
+            http.request("/playlists/" + filledId + "/movies/238", r -> {
+                r.header("Cookie", cookie(sessionId));
+                r.post(noBody());
+            });
+
+            var indexBody = http.get("/playlists", r -> r.header("Cookie", cookie(sessionId))).body().string();
+
+            // description rides under the name
+            assertThat(indexBody).contains("Cowboys in orbit");
+            // per-row quick actions: Share carries the /list snapshot URL (hidden when
+            // empty), Delete posts
+            assertThat(indexBody).contains("data-share-url=\"/list?movie=238&amp;name=Space%20westerns\"");
+            assertThat(indexBody).contains("data-share-url=\"/list?&amp;name=Empty\" hidden");
+            assertThat(indexBody).contains("action=\"/playlists/" + filledId + "/delete\"");
+            assertThat(indexBody).contains("action=\"/playlists/" + emptyId + "/delete\"");
+            // the share dialog itself is on the page, and the QR lib is loaded
+            assertThat(indexBody).contains("<dialog id=\"share\"");
+            assertThat(indexBody).contains("src=\"/js/qrcode.js\"");
+        });
+    }
+
+    @Test
     void playlistCreateWithMoviesStaysInDialogAndIsBulkIdempotent() {
         authTest((server, http) -> {
             var sessionId = signIn(http, "sharer@bar.com");

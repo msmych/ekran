@@ -154,21 +154,21 @@ public class TmdbMapper {
     }
 
     private List<FilmographyItem> filmography(List<CrewCredit> crew, String department) {
-        return sortedByYear(crew.stream()
+        return sortedByReleaseDate(crew.stream()
             .filter(c -> department.equals(c.department()))
-            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), imageUrl("w185", c.posterPath())))
+            .map(c -> new FilmographyItem(c.id(), c.title(), localDate(c.releaseDate()), imageUrl("w185", c.posterPath())))
             .toList());
     }
 
     private List<FilmographyItem> filmographyFromCast(List<CastCredit> cast) {
-        return sortedByYear(cast.stream()
-            .map(c -> new FilmographyItem(c.id(), c.title(), year(c.releaseDate()), imageUrl("w185", c.posterPath())))
+        return sortedByReleaseDate(cast.stream()
+            .map(c -> new FilmographyItem(c.id(), c.title(), localDate(c.releaseDate()), imageUrl("w185", c.posterPath())))
             .toList());
     }
 
-    private List<FilmographyItem> sortedByYear(List<FilmographyItem> items) {
+    private List<FilmographyItem> sortedByReleaseDate(List<FilmographyItem> items) {
         return items.stream()
-            .sorted(Comparator.comparing(FilmographyItem::year, Comparator.nullsFirst(Comparator.naturalOrder())).reversed())
+            .sorted(Comparator.comparing(FilmographyItem::releaseDate, Comparator.nullsLast(Comparator.reverseOrder())))
             .toList();
     }
 

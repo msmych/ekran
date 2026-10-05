@@ -1,116 +1,69 @@
 # Data Model
 
-Domain models contain only what the UI needs today — not TMDB's full schema. All types live in `domain/`.
+Domain models carry only what the UI needs — not TMDB's full schema. All types live in
+`domain/`; templates bind to view models only, never domain records directly.
 
-## domain types (MVP)
+## Domain types
 
 ```java
 enum Department { DIRECTING, ACTING, WRITING, OTHER }   // known_for_department buckets
 
-record SearchResult(
-    long tmdbId,
-    SearchType type,            // MOVIE | PERSON — search type from the home toggle / `type` param
-    String title,               // movie title or person name
-    String originalTitle,       // raw from TMDB; display layer hides it when same as title
-    Integer year,               // release year, nullable
-    String subtitle,            // movie: rating "8.2"; person: known-for dept (later step)
-    URI thumbUrl                // absolute, nullable
-) {}
+record SearchResult(long tmdbId, SearchType type /* MOVIE | PERSON */, String title,
+                    String originalTitle, Integer year, String subtitle, URI thumbUrl) {}
+                    // subtitle: movie = rating "8.2"; person = known-for dept
 
-record SearchResultPage(List<SearchResult> results) {}
-
-record PersonLink(long tmdbId, String name, String role, Department department) {}
-
-record Movie(
-    long tmdbId,
-    String title,
-    String originalTitle,       // null when same as title
-    LocalDate releaseDate,      // nullable
-    Integer runtimeMinutes,     // nullable
-    List<String> genres,
-    String overview,
-    URI posterUrl,              // nullable
-    URI backdropUrl,            // nullable
-    List<PersonLink> directors,
-    List<PersonLink> writers,
-    List<PersonLink> cast,      // principal, billing order
-    String originalLanguage,    // drives video ranking
-    List<MovieVideo> videos     // YouTube-only, filtered in the adapter
-) {}
+record Movie(long tmdbId, String title, String originalTitle, LocalDate releaseDate,
+             Integer runtimeMinutes, List<String> genres, String overview,
+             URI posterUrl, URI backdropUrl,
+             List<PersonLink> directors, List<PersonLink> writers, List<PersonLink> cast,
+             String originalLanguage, List<MovieVideo> videos) {}
 
 record MovieVideo(String key, String name, String type, boolean official, String language, String publishedAt) {}
+record PersonLink(long tmdbId, String name, String role, Department department) {}
 
-record FilmographyItem(long movieTmdbId, String title, Integer year, URI posterUrl) {}
+record FilmographyItem(long movieTmdbId, String title, LocalDate releaseDate, URI posterUrl) {}
+record Filmography(List<FilmographyItem> directing, List<FilmographyItem> writing,
+                   List<FilmographyItem> acting) {}   // each sorted release date desc, undated last
 
-record Filmography(
-    List<FilmographyItem> directing,   // sorted year desc
-    List<FilmographyItem> writing,
-    List<FilmographyItem> acting
-) {}
-
-record Person(
-    long tmdbId,
-    String name,
-    Department knownFor,
-    LocalDate born,             // nullable — birthday
-    LocalDate died,            // nullable — deathday
-    URI profileUrl,            // nullable
-    Filmography filmography
-) {}
+record Person(long tmdbId, String name, Department knownFor, LocalDate born, LocalDate died,
+              URI profileUrl, Filmography filmography) {}
 ```
 
 Principles:
 
-- No TMDB field names survive into domain (`poster_path` → `posterUrl`; the vote average never enters `Movie` — only the search subtitle formats it, see below).
-- No IDs other than TMDB ID in MVP (Step 2 adds local canonical IDs; keeping domain lean now makes that a repository concern).
-- Nulls mean "unknown/absent" — UI omits, never shows placeholders like "N/A".
+- No TMDB field names survive into domain (`poster_path` → `posterUrl`); nulls mean
+  "unknown/absent" — the UI omits, never shows placeholders.
+- Display formatting happens in view models (runtime `112` → `"1h 52m"`, rating `7.813` →
+  `"7.8"`, dates → years, joined genres, computed `href`s), keeping templates dumb and
+  formatting testable.
+- `MovieCardVm` is the one shared card shape for `/list`, filmography grids, playlists;
+  filmography cards carry no duration (the person-credits payload has no `runtime`, and
+  fetching it per credit would break the one-call-per-page rule).
 
-## View models (`web/viewmodels`)
-
-Derived from domain inside route handlers / small assemblers; preformatted for display:
-
-- runtime `112` → `"1h 52m"` (omit if null)
-- search subtitle: movie vote average `7.813` → `"7.8"` (the movie page itself no longer shows a rating — deliberately dropped)
-- date → year only where the view shows a year
-- joined genre list, absolute URLs already resolved
-- `href` values (`/movies/{id}`, `/persons/{id}/{department}`) computed once
-
-Templates bind to view models only, never domain records directly, so display formatting stays in code (testable) and templates stay dumb.
-
-## Step 2: PostgreSQL / local knowledge base (design target, not MVP work)
-
-**Landed first (auth + user data):** `users`, `login_tokens` (SHA-256-hashed, TTL, single-use), `sessions` (the session id column stores a hash of the cookie value — see `configuration-and-ops.md`), plus the marked/playlist tables:
+## PostgreSQL schema
 
 ```sql
-marked_movies   -- user_id, movie_id (tmdb), created_at;
-                  PK (user_id, movie_id)
-movie_notes     -- user_id, movie_id (tmdb), note (≤500), updated_at;
-                  PK (user_id, movie_id)
+users           -- id, email (unique), created_at
+login_tokens    -- user_id, token_hash (SHA-256) unique, expires_at, used_at   (single-use, TTL)
+sessions        -- user_id, session-hash, expires_at   (cookie value is hashed, not stored)
+marked_movies   -- user_id, movie_id, created_at;      PK (user_id, movie_id)
+movie_notes     -- user_id, movie_id, note (≤500), updated_at;   PK (user_id, movie_id)
 playlists       -- id, user_id, name (≤60, not unique), description (≤1000, nullable),
-                  created_at, updated_at; indexed by user_id
-playlist_movies -- playlist_id, movie_id (tmdb), note (≤500, nullable),
-                  position (MAX+1 on insert), created_at;
-                  PK (playlist_id, movie_id), UNIQUE (playlist_id, position)
+                -- created_at, updated_at
+playlist_movies -- playlist_id, movie_id, note (≤500, nullable), position (MAX+1 on insert), created_at;
+                -- PK (playlist_id, movie_id), UNIQUE (playlist_id, position)
 ```
 
-Movie references are TMDB IDs stored directly (`BIGINT`) — no local movies table yet, so marks/playlists are verified only by format (`[1-9][0-9]{0,9}`), resolved through TMDB at render time. All queries are scoped by `user_id` from the session; a foreign playlist id is a 404, not a leak.
+Rules:
 
-Notes are detached from marks: **movie notes** (`movie_notes`) are the user's annotation of a movie — noting needs no mark, unmarking and moving marks into playlists never touch them (V7 migrated the former `marked_movies.note` column into the table and dropped it). Notes are a signed-in feature — there is no anonymous local-note storage anymore. The `/notes` page lists every movie with a note (`notedMovies(userId)`, capped at 100 like every card surface). Notes (movie notes, playlist descriptions, per-membership notes) are trimmed on write, blank → NULL (the `movie_notes` row is deleted), and are private per-user data — they never appear in shared `/list?…` URLs (the share URL carries only movie ids + the list name). Re-adding an existing membership never overwrites its note or position (`ON CONFLICT (playlist_id, movie_id) DO NOTHING`). Composing a playlist from marks never copies notes — new memberships start bare; playlist annotation is a deliberate act done in the playlist itself.
-
-The repository boundary above is designed so the knowledge base lands later without touching `service/` or `web/`. Intended schema:
-
-```sql
-movies          -- canonical movie metadata + tmdb_id (unique)
-people          -- canonical person + tmdb_id (unique)
-movie_credits   -- movie_id, person_id, department, job, character, ordering
--- optional fetch metadata
-movies.fetched_at / movies.updated_at, people.fetched_at / people.updated_at
-```
-
-Evolution:
-
-- Repositories swap from TMDB-backed to PostgreSQL-backed (with TMDB refresh/enrichment for missing or stale rows).
-- Local search (full-text / trigram) eventually answers common queries without a TMDB round trip; TMDB remains upstream truth for unknown/stale metadata.
-- Domain models may grow a local `id` alongside `tmdbId` — one field, no structural change.
-
-Non-goal reminder: do **not** implement any of this in step one. The only MVP obligation is the clean repository boundary specified in `architecture.md`.
+- Movie references are raw TMDB ids (`BIGINT`) — no local movies table; ids are validated
+  by format only (`[1-9][0-9]{0,9}`), resolved through TMDB at render time.
+- All queries are scoped by `user_id` from the session; a foreign playlist id is a 404,
+  never a leak.
+- **Notes are detached from marks**: a note needs no mark; unmarking or moving marks into
+  playlists never touches notes. Notes are signed-in-only, trimmed on write, blank →
+  deleted, private — they never appear in shared `/list?…` URLs.
+- Re-adding an existing membership never overwrites its note or position
+  (`ON CONFLICT DO NOTHING`); composing a playlist from marks creates bare memberships.
+- Adjacent position swaps step through a temporary `MAX+1` position inside a transaction
+  (positions are unique per playlist but may have gaps).

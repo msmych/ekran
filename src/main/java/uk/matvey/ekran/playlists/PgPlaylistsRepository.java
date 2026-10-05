@@ -2,10 +2,13 @@ package uk.matvey.ekran.playlists;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 import uk.matvey.ekran.db.Jdbc;
+import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
 
@@ -17,16 +20,28 @@ public class PgPlaylistsRepository implements PlaylistsRepository {
         this.dataSource = dataSource;
     }
 
+    // header row plus the membership ids on one connection: one pool
+    // round-trip and a consistent snapshot of the index
     @Override
     public List<Playlist> playlists(long userId) {
-        return Jdbc.queryList(dataSource, "load playlists",
-            rs -> new Playlist(rs.getLong(1), rs.getString(2), rs.getInt(3)), """
-                SELECT p.id, p.name, count(pm.movie_id) AS movie_count
-                FROM playlists p
-                LEFT JOIN playlist_movies pm ON pm.playlist_id = p.id
-                WHERE p.user_id = ?
-                GROUP BY p.id, p.name, p.updated_at
-                ORDER BY p.updated_at DESC, p.id""", userId);
+        return Jdbc.read(dataSource, "load playlists", conn -> {
+            var movieIds = new LinkedHashMap<Long, List<Long>>();
+            Jdbc.queryList(conn,
+                rs -> movieIds.computeIfAbsent(rs.getLong(1), k -> new ArrayList<>()).add(rs.getLong(2)), """
+                    SELECT pm.playlist_id, pm.movie_id
+                    FROM playlist_movies pm
+                    JOIN playlists p ON p.id = pm.playlist_id
+                    WHERE p.user_id = ?
+                    ORDER BY pm.playlist_id, pm.position""", userId);
+            return Jdbc.queryList(conn,
+                rs -> new Playlist(rs.getLong(1), rs.getString(2), rs.getString(3),
+                    movieIds.getOrDefault(rs.getLong(1), List.of()).size(),
+                    movieIds.getOrDefault(rs.getLong(1), List.of()).stream()
+                        .limit(MovieIds.MAX_SET).toList()), """
+                    SELECT id, name, description FROM playlists
+                    WHERE user_id = ?
+                    ORDER BY updated_at DESC, id""", userId);
+        });
     }
 
     @Override

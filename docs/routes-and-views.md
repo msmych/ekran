@@ -1,197 +1,132 @@
 # Routes and Views
 
-## URL surface (canonical, deep-linkable)
+All pages are server-rendered by Thymeleaf; no client-side routing. Routes are plural
+resources (`/movies/{id}`, `/persons/{id}`); `/search` is one path — the `type` param
+carries the movie/person distinction.
 
 | Route | Purpose | Response |
 |---|---|---|
-| `GET /` | Search-first homepage; with `?q=` renders home pre-filled with results | Full page |
-| `GET /search?q={query}` | Movie search results | Full page **or** HTMX fragment (see below) |
-| `GET /movies/{tmdbId}` | Movie detail page | Full page |
-| `GET /persons/{tmdbId}` | Person overview + filmography (all sections) | Full page |
-| `GET /persons/{tmdbId}/directing` | Director filmography | Full page |
-| `GET /persons/{tmdbId}/acting` | Acting filmography | Full page |
-| `GET /persons/{tmdbId}/writing` | Writing credits | Full page |
-| `GET /about` | About the app (author link, shortcuts list) | Full page |
-| `GET /list?movie={id}&movie={id}…` | Shared movie list — rendered from the URL, not from any server-side state; optional `name={title}` names the list | Full page |
-| `GET /list/card?movie={id}` | Single movie-card fragment — used by `marked.js` when a movie is marked from the search overlay while viewing `/list` | HTMX-style fragment |
-| `GET /marked` | Signed-in: your server-persisted marked movies (anonymous → redirect to `/signin`) | Full page |
-| `GET /notes` | Signed-in: all your noted movies, rows view by default (anonymous → redirect to `/signin`) | Full page |
-| `GET /marked/ids` · `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` · `POST /marked/migrate` | Mark sync endpoints (authed; `POST /marked?movie=…` is the idempotent local→server merge used by `Add all to marked`; `POST /marked/migrate` is the JSON sign-in migration — today's client sends bare `{movies:[{movieId}]}`; entries with a legacy `note` field still merge, with the PG note winning on conflict) | 204 / plain text ids |
-| `GET`/`POST /movies/{movieId}/note[/edit]` | Movie note display/editor fragments (≤500 chars, trim, blank → NULL; a note needs no mark — notes are detached from marks) | HTMX fragment |
-| `GET`/`POST /playlists` · `GET /playlists/{id}` · `POST …/rename` · `POST …/description` · `POST …/delete` · `POST …/movies` (bulk add) · `POST`/`DELETE …/movies/{movieId}` · `GET`/`POST …/movies/{movieId}/note[/edit]` · `POST …/movies/{movieId}/move` (reorder, `dir=up\|down`, wraps at the edges) · `GET /playlists/select` | Signed-in playlist CRUD + membership mutations (`/select` is the "Add to playlist" dialog fragment — single movie toggles membership, multiple movies bulk-add) | Full page / 303 / HTMX fragment |
-| `GET /videos/{key}` | YouTube player fragment for trailer/video playback | HTMX fragment |
+| `GET /` | Search-first homepage; `?q=` renders it pre-filled with results | Full page |
+| `GET /search?q={query}&type={movie\|person}` | Search — fragment for HTMX, full page for direct navigation | Fragment / full page |
+| `GET /movies/{tmdbId}` | Movie detail | Full page |
+| `GET /persons/{tmdbId}` | Person filmography — defaults to the known-for department | Full page |
+| `GET /persons/{tmdbId}/all` / `/{directing\|acting\|writing}` | Full filmography / one department | Full page |
+| `GET /about` | About page | Full page |
+| `GET /list?movie={id}…&name={title}` | Shared list rendered from the URL | Full page |
+| `GET /list/card?movie={id}` | Single-card fragment (marked.js overlay-mark on `/list`) | Fragment |
+| `GET /marked` · `GET /notes` | Signed-in marks / notes (anonymous → `/signin`) | Full page |
+| `POST`/`DELETE /marked/{movieId}` · `POST`/`DELETE /marked?movie=…` · `GET /marked/ids` · `POST /marked/migrate` | Mark sync (authed; bulk POST = idempotent merge; migrate = JSON sign-in migration, idempotent) | 204 / text |
+| `GET`/`POST /movies/{movieId}/note[/edit]` | Movie note fragments (≤500 chars) | Fragment |
+| `GET`/`POST /playlists` · `GET /playlists/{id}` · `POST …/rename\|/description\|/delete\|/movies` · `POST`/`DELETE …/movies/{movieId}` · `GET`/`POST …/movies/{movieId}/note[/edit]` · `POST …/movies/{movieId}/move` · `GET /playlists/select` | Playlist CRUD + membership (authed, ownership-scoped; `/select` = the Add-to-playlist dialog fragment) | Page / 303 / fragment |
+| `GET /signin` · `/signin/sent` · `GET /auth/link?token=…` · `POST /signout` · `GET /account` | Magic-link auth | Page / 303 |
+| `GET /videos/{key}` | YouTube player fragment (trailers dialog) — key validated `[A-Za-z0-9_-]{6,}` → 404 otherwise (never passes unvalidated input into an iframe URL) | Fragment |
+| `GET /health` · `/healthz` | Readiness (pings DB) / liveness | JSON / text |
 
-All pages are server-rendered by Thymeleaf. No client-side routing.
+## Search (`/`, `/search`)
 
-Naming rationale: resource routes are plural (`/movies/{id}`, `/persons/{id}`); `/search` stays a single generic path — the `type` parameter carries the movie/person distinction without breaking URLs.
+- Fragment mode (`HX-Request: true`) renders only the result list; full-page mode renders
+  home with the query pre-filled (deep-linkable). Blank query in fragment mode → truly
+  empty 200 body (whitespace text nodes would keep the overlay panel open).
+- Query trimmed server-side; >~100 chars → empty state, not an error. First result page
+  only (TMDB default 20).
+- Movie row: thumb (w92), title, original title when distinct, year, rating subtitle, mark
+  toggle. Person row: thumb, name, known-for subtitle, no mark toggle.
+- Movies/People toggle on every page (home: pills under the input; overlay: pills at the
+  panel top, outside the swapped `#overlay-results`). Person pages default the overlay to
+  people. Deep links: `/?q=…&type=person`.
+- See `search-interaction.md` for the client contract.
 
-**UI direction:** deliberately basic in Step 1 — clean typography, minimal CSS, no design system, no polish. We'll figure out the visual direction later; do not invest in it now.
+## Movie page (`/movies/{tmdbId}`)
 
-## `/` — homepage
+- Quiet head: title with the mark toggle at the row's right edge; meta line year · runtime
+  · genres (no rating); poster (w342) opens the original-size version in a `<dialog>`.
+- Crew links: directors → `/persons/{id}/directing`, writers (with jobs) → `…/writing`,
+  top-8 cast (with character) → `…/acting`. Empty values omit rows entirely.
+- **Trailers** chip → native `<dialog>`: best-ranked video first (Trailer > Teaser >
+  official > original language > newest), lazy iframe without autoplay; picking a video
+  swaps the player fragment (`/videos/{key}`) with autoplay; closing the dialog pauses
+  via YouTube post-message. Each item links to the real watch page (JS-off fallback).
+- **Playlists row** (signed-in): chips are plain links into the playlist — membership
+  changes happen only in the dialog opened by the trailing **Edit**/**+ Add** button
+  (no accidental one-click removals).
+- **Movie note** block under the actions (signed-in only, marked or not); `n` hotkey edits.
+- Open Graph tags (Telegram previews are the target; fetcher runs no JS, the page is fully
+  SSR): `og:title` "Title (Year)", overview capped at 300, `og:image` = w780 backdrop
+  (falls back to poster), canonical URL. Only pages with an `og` model render tags.
+- "TMDB ↗" link at the bottom, after the credits.
 
-- Autofocused `<input type="search" id="search-input">` (shared `searchbar.html` fragment) in a prominent hero position; nothing else competes for attention — the "Search movies…" hint is the input's placeholder; nothing else renders until a query exists.
-- Optional: persist nothing. No recent searches, no history (MVP).
-- The same Thymeleaf fragment that renders results on `/search` is embedded empty on `/` and filled by HTMX.
-- With `?q=`, the homepage renders the query pre-filled plus results (deep-linkable `/?q=alien`). Always a full page — even for HTMX requests — because it is the swap target for boosted navigation.
+## Person pages (`/persons/{tmdbId}[/all|/{department}]`)
 
-## `/search?q={query}&type={movie|person}` — dual-mode response
+- Bare URL shows the known-for department's section (actor → Acting); unmapped known-for
+  or an empty section falls back to the all view at `/all`. Tabs: `Directing | Acting |
+  Writing | All`, current one marked; unknown department → 404.
+- Header: name, "Known for X", life dates ("Born November 30, 1937" / en-dash range),
+  TMDB link. No biography — deliberately dropped.
+- Filmography: shared movie-card grid per department, sorted by release date desc
+  (undated last), no role line, no duration (see `data-model.md`). Every title links to
+  `/movies/{id}`.
 
-The route inspects the `HX-Request` header:
+## Shared list (`/list`), `/marked`, `/notes`
 
-- **HTMX request** (`HX-Request: true`): return only the `results :: results-fragment` fragment (the result list), HTTP 200. This is the search-as-you-type path and must stay lightweight — it renders only the result list HTML, nothing else.
-- **Regular request** (direct navigation, bookmark, refresh): return a full page containing the query pre-filled in the search box plus the same results fragment. Copying `/search?q=alien` must work as a bookmark.
+- `/list` renders purely from the URL: repeated `movie` params, invalid values dropped,
+  dupes collapsed, order preserved, ≤100 honored; missing movies skip their card without
+  failing the page. Optional `name=` renders as the title (inline pencil edit).
+- Title/bulk actions (`marked.js`, from comparing URL ids to local marks): the list is
+  "yours" only when the card set is your marked set → "Marked movies" + **Clear all**;
+  otherwise "Shared list" + **Add all to marked** (explicit opt-in — visiting a URL never
+  imports silently). Unmarking a card on `/list` removes it and rewrites the address bar.
+- **Share** chip → QR dialog of the current URL (client-side QR by design: the URL is
+  browser-owned state). **Print** chip → print stylesheet lays movies out as rows with
+  original title and directors as print-only sub-lines.
+- `/marked`: the signed-in marked set (capped at 100, one TMDB call per card via the
+  cache), same share/print machinery, plus **Move all to playlist** (see below) and
+  server-side Clear all.
+- `/notes`: every noted movie, rows view server-defaulted; unmarked movies with notes
+  appear here (notes are detached from marks).
+- **Grid ⇄ Rows** toggle on all four card lists (`localStorage` preference; a
+  server-rendered view wins). Person filmography and search stay grid-only.
+- **Movie notes** (signed-in, ≤500 chars): inline ✎ editor on every card and the movie
+  page; htmx swaps the whole note area; Escape cancels. Never in shared URLs.
 
-Edge cases:
+## Playlists (`/playlists`)
 
-- Blank/whitespace-only `q` → full-page mode: homepage state; fragment mode: **truly empty 200 body** (not a whitespace-only fragment — whitespace text nodes would defeat the client-side `:not(:empty)` overlay-visibility rule). HTMX debounce should not even fire in most cases — see `search-interaction.md`.
-- Query length: trim; treat queries longer than ~100 chars as invalid → empty result state, not an error.
-- Pagination is **not** in the MVP: return the first result page only (TMDB default page size is 20 movies). Design note: do not add "load more" now, but keep `SearchResultPage` shaped so a page token could be added later.
+- Ownership-scoped SQL everywhere; names ≤60 trimmed (duplicates allowed); descriptions
+  ≤1000, blank → none.
+- **Index**: New button reveals a name+description row; rows show the description under
+  the name plus quick actions — **Share** (row-level opener carrying its own
+  `data-share-url` `/list?movie=…&name=…` snapshot, ids capped at 100 in position order,
+  hidden when empty; `marked.js` copies it onto the `#share` dialog before rendering the
+  QR) and **Delete** (`hx-confirm`-guarded, lands back on the index).
+- **Detail**: description + rename pencils (in-place forms), cards with per-membership
+  notes, **Reorder** mode (arrows post `move` with `dir=up|down`, wrapping at the edges,
+  server swaps positions, client mirrors the DOM move; the share URL's movie params follow
+  the live order), Share/Print/Rows/Delete chips.
+- **Add-to-playlist dialog** (`GET /playlists/select?movie=…`): single movie →
+  membership-toggle rows (hairline rows like the index: name left, accent check for
+  members, muted `+` for addable; the membership note rides inside the row, editable);
+  multiple movies → bulk-add picker (hidden movie set rides along via `hx-include`, so
+  several adds work without re-opening). Bulk adds and bulk-mode creates keep the dialog
+  open with a confirmation + Open playlist link. Creating from the dialog includes the
+  movie(s) immediately; new memberships start bare — notes are never inherited.
+- **Compose workflow** — from `/marked`, adding/creating is a **move**: the marks clear
+  (marks are the staging inbox, playlists the destination); movie notes stay on the movie
+  pages. From shared lists it stays a copy.
+- Membership is independent of marks everywhere else: unmarking never removes from a
+  playlist.
+- Navigation mutations: `HX-Redirect` for fetch/dialog flows, 303 for plain/boosted forms;
+  bulk dialog add/create re-renders the fragment in place instead.
 
-### Result item
+## Footer, errors, static assets
 
-Compact row, in TMDB relevance order:
-
-- **Movie row:** poster thumbnail (w92), title, original title (shown under the title, muted — only when it differs from the title; useful when searching by a foreign-language title), release year, rating as subtitle (the movie search response carries no cast/crew or genre names — `vote_average` is the free high-value field). Links to `/movies/{id}`. Every movie row carries the card bookmark toggle (`data-card-mark`, `ResultItemVm.tmdbId`), so movies can be marked straight from the results.
-- **Person row** (`type=person`): profile thumbnail (w92), name, known-for department as subtitle (`Department.fromTmdb` display name, e.g. "Directing"; "Other" for anything unmapped). Links to `/persons/{id}`. No mark toggle (`tmdbId` is null — marking is movie-only).
-
-The homepage carries a tiny Movies/People pill toggle under the search input (`search-toggle`); it flips the hidden `#search-type` value that the input's requests include via `hx-include`, and `search.js` re-fires the search through the input's bare `search` trigger (no `changed` gate, so it runs even though the query didn't change). The state deep-links via `/?q=…&type=person` / `/search?q=…&type=person`. The header overlay search stays movie-only — movies are the focus; people are reachable from movie pages and the home toggle.
-
-Keyboard result navigation: `↓`/`↑` (or `Ctrl N`/`Ctrl P`) move a highlight through results while the search input has focus; `Enter` opens the highlighted result, and without a highlight it fires an immediate HTMX search via the `search`-event trigger. Handled in `search.js` — see `search-interaction.md`.
-
-## `/movies/{tmdbId}` — movie detail
-
-One TMDB call (`/movie/{id}` with `append_to_response=credits,videos` — see `tmdb-integration.md`). Layout, top to bottom:
-
-- Poster (w342) on the side; title + original title (if different) as heading. (The w780 backdrop is used only as `og:image` — never displayed on the page.)
-- The poster is a button (`data-dialog="poster"`): clicking it opens a native `<dialog id="poster">` with the **original-size** poster (same TMDB path, `w342` → `original` size segment — `MovieDetailVm.fullPosterUrl`), movie title in the dialog head, the same generic dialog machinery as trailers (`search.js` opener, Escape/✕/backdrop close, background scroll lock). The dialog is narrower than the default (`min(480px, …)`) and the image is viewport-bounded.
-- Meta line: year · runtime (`1h 52m` format) · genres (comma-joined). No rating — dropped from the page deliberately.
-- **Open Graph link previews** — the movie page puts an `OgVm` (`OgVm.movie(vm, ctx.url())` in `MovieRoutes`) into the render model; `head.html` renders `og:title` (`Title (Year)`), `og:description` (overview, capped at 300 chars), `og:image`, `og:type` (`video.movie`), `og:site_name` (`ekran`) and `og:url` (canonical request URL) when the model contains `og` — pages without it render no OG tags, and the `head(title)` fragment signature stays unchanged (fragments share the render model). Telegram link previews are the primary target: its fetcher does a plain GET (no JS — the page is fully SSR, which is what makes this work), and `og:image` is the **w780 backdrop** — at 780px wide it clears Telegram's ~600px threshold for the large preview above the text; the w342 poster is the fallback when no backdrop exists (compact preview beside the text). Telegram caches previews aggressively per URL — @WebpageBot or a changed URL is the only way to refresh one. Person/list pages can adopt the same model attribute later.
-- **Videos (trailers)** — a chip-styled `Trailers (N)` link on its own row below the info bits (pill-shaped, muted; no chip when there are no videos), opening a native `<dialog id="trailers">` rendered server-side at the bottom of the page:
-  - The dialog is opened by a tiny delegated handler in `search.js` (`data-dialog` attributes). Escape, ✕ and backdrop click close it; focus trapping comes free from the platform. Background scrolling is locked while any dialog is open (`html:has(dialog[open])` sets `overflow: hidden` in `app.css` — a modal `<dialog>` does not stop the page behind it from scrolling on its own), so the dialog itself scrolls instead: `app.css` gives `dialog` a viewport-bounded `max-height` with `overflow: auto` + `overscroll-behavior: contain` (long trailer lists scroll inside the dialog; scroll doesn't chain back to the locked page).
-  - Layout: title bar (`Trailers`, ✕ at the top right), the best-ranked video's frame edge-to-edge at full dialog width, its caption close beneath it, then the full list of videos ranked best-first (ranking in `MovieDetailVm.rankVideos`): Trailer > Teaser > other types; official > non-official; original-language > English > other; newest `published_at` wins ties (null dates rank last). The currently playing video is highlighted in the list (accent color; the best-ranked one starts selected, the highlight follows picks).
-  - The initial frame is a `loading="lazy"` iframe **without autoplay** — a closed dialog is `display: none`, so nothing is fetched until the dialog actually opens; opening loads the frame paused (the user has not asked to play yet).
-  - Picking a video → HTMX `GET /videos/{key}?name=…` swaps the player fragment into the dialog (`hx-target="#player" hx-swap="outerHTML"`): the same frame with `autoplay=1` — the click is the explicit play intent, so autoplay is appropriate there. The embed markup lives in one shared fragment (`templates/video-embed.html`), parameterized by autoplay.
-  - Closing the dialog (Escape/✕/backdrop) pauses the video: hiding a dialog does not stop its audio, so `search.js` listens for the dialog's `close` event (fires for every close path) and sends YouTube's `pauseVideo` post-message to the frame — enabled by `enablejsapi=1` in the embed URL.
-  - Each list item also links to the real YouTube watch page (`https://www.youtube.com/watch?v={key}`) — progressive enhancement: works with JS off, nicer with it. The `Trailers` link itself falls back to the best-ranked video's watch page.
-  - **CDN exception:** the `youtube-nocookie.com` iframe (fetched when the trailers dialog opens) is the sole third-party runtime request in the app — a deliberate trade-off, you can't proxy YouTube. Nothing loads while the dialog is closed.
-- **Playlists row** (signed-in only, `.movie-playlists-row` under the mark toggle): one pill per playlist the movie belongs to — **plain links into the playlist page**, deliberately *not* controls (an earlier version fired `DELETE /playlists/{id}/movies/{movieId}` from a click anywhere on the chip, which made accidental removals trivially easy). All membership changes happen in the dialog opened by the trailing button: **Edit** when the movie is in at least one playlist, **+ Add** otherwise (`hasMembers` model flag, computed by `PlaylistsService.hasMemberships`; default when missing is `+ Add`). The empty `<dialog id="playlist-select">` shell is rendered at the bottom of the page; the button pairs `data-dialog="playlist-select"` with `hx-get /playlists/select?movie=…` into `#playlist-select-body`, and dialog mutations return the fragment plus the chips div out-of-band, so the row stays in sync while the dialog is open.
-- **Mark** — an icon-only toggle at the head's far right edge (`.movie-info` stretches the full remaining width, `.movie-title-row` is `space-between` — the same corner the mark takes in the cards' row view; padding gives the bare icon a usable tap target; a bookmark icon, 18px, outline muted → filled accent when marked; `aria-pressed` driven, constant size so nothing jumps). Toggles the movie in the visitor's `localStorage` (`ekran.markedMovies` — JSON array of TMDB IDs, insertion-ordered, deduped, corrupt or non-integer entries filtered on load, save failures ignored; legacy entries may also be objects `{movieId, note}` from the pre-detach format — the loader accepts both shapes and ignores the note; the old separate `ekran.movieNotes` local map is no longer used, notes are a signed-in feature) **when signed out**; when signed in the toggle persists to the server instead (`POST`/`DELETE /marked/{movieId}`) and the button's state is server-rendered from `marked_movies` (the `data-marked-ids` seed span in `header.html` tells `marked.js` which mode it is in). Signing in migrates local marks to the server (`POST /marked/migrate` with JSON `{movies:[{movieId}]}` — idempotent, a legacy `note` field in an entry still merges with the PG note winning on conflict; `localStorage` is cleared only after a 204). The header (shared `templates/header.html` fragment on every page) is `logo · search · [Marked · N, Sign in]` — the search centered between the logo and the Account/Sign-in cluster pinned in the right corner. On narrow screens (≤640px) the header row wraps: the search drops to its own full-width line below (like the homepage always does), so it fits when anonymous `[ekran][Marked · N][Sign in]` crowds the row, and focusing can no longer expand it past the viewport edge — the input stays at 100% width with no focus expansion. Anonymous users see `Marked · N` in the header (hidden until the first mark, only from JS); signed-in users find it inside the `Account` popup instead (server-hidden at zero marks), alongside `Playlists · N` (count from the session middleware, server-rendered — unlike Marked it stays visible at zero, the popup is the only entry point to creating the first playlist), `Notes · N` (same always-visible pattern, linking to the `/notes` page) and `Sign out`. The physical-key `m` shortcut does the same and is ignored while editing text or with modifier keys. The header (shared `templates/header.html` fragment on every page) shows `Marked · N` — on the homepage it shares the `ekran` logo row (search below); elsewhere it sits at the right, just left of the search bar. It is hidden at zero marks, but only from JS: the server always renders the link (progressive enhancement, so a stale or failed script can never hide the entry point); with working JS its `href` is kept in sync with the current marks, so the link is always directly shareable. The link carries `hx-boost="false"`: boosted anchors freeze their `href` at htmx process time, so a boosted Marked link navigated to a stale URL missing recently-marked movies (bug seen in production — the click must always read the live `href`). Other open tabs follow via the `storage` event, and a bfcache restore (browser back) re-syncs via the `pageshow` event — a restored page shows its stale snapshot and fires no scripts otherwise.
-- Overview paragraph.
-- **Top crew:**
-  - Director(s) — each name is a link to `/persons/{id}/directing`.
-  - Writer(s) — job(s) shown in parentheses where useful (`Screenplay`, `Story`); links to `/persons/{id}/writing`.
-- **Principal cast:** top ~8 billing order; character name under the actor name; each links to `/persons/{id}/acting`.
-
-Empty-value rules: omit a row entirely if there is no value (no "Runtime: —" noise). Missing poster/backdrop → CSS placeholder, never a broken image.
-
-Crew headings are pluralized by count: "Director"/"Directors", "Writer"/"Writers" (template-side ternary on list size).
-
-Each detail page links to the upstream source: a "TMDB ↗" link (`https://www.themoviedb.org/movie/{id}` / `.../person/{id}`, `target="_blank" rel="noopener"`). On the movie page it lives at the bottom, after the credits (muted, out of the busy head); on person pages it stays near the header.
-
-Back-link to the originating search (`?back=/search?q=…` or simpler: browser back is fine in MVP; keep it simple — browser back only).
-
-## `/videos/{key}` — video player fragment
-
-HTMX-only route (registered in `EkranApp.create`, not a `*Routes` class — no service/IO involved):
-
-- `{key}` is a YouTube video id, validated `[A-Za-z0-9_-]{6,}` — anything else is a 404 (never passes unvalidated input into an iframe URL). No TMDB call: everything needed (key, optional caption `?name=`) is in the request.
-- Renders `templates/video-player.html`: `<div id="player">` + the shared 16:9 `video-embed.html` fragment (`youtube-nocookie.com/embed/{key}?enablejsapi=1&autoplay=1` — `enablejsapi` lets the dialog send `pauseVideo` on close) + caption below. The `id="player"` is kept on the fragment so repeated swaps (switching between videos in the dialog) keep retargeting the same slot.
-- Only reached via HTMX from the trailers dialog on the movie page; deep-linking straight to it works but is pointless (a bare player with a caption).
-
-## `/list?movie={id}…` — shared movie list
-
-A public, read-only page rendered **from the URL** — no per-user server state is needed to view it (an anonymous visitor's own marks live in their browser's `localStorage`; a signed-in visitor's marks live in `marked_movies`):
-
-- Repeated `movie` params are TMDB IDs. Parsing rules (`ListRoutes`): non-numeric/zero/negative/over-10-digit values are silently dropped, duplicates collapse (first occurrence wins), requested order is preserved, at most 100 IDs are honored (protects the server and keeps URLs/QRs sane).
-- IDs are resolved through `MovieService.findByIds` — TMDB has no batch endpoint, so it is one request per movie internally, but that stays out of the web layer; a 404/missing movie skips that card with a warning log and never fails the whole list.
-- Cards (shared `movie-card.html` fragment — the same card as the person filmography grids): poster, title, year, duration (`1h 52m`, no rating); poster and info each link to `/movies/{id}`. Every card carries a bookmark toggle (`data-card-mark`) at the **title level** — a quiet right-aligned icon on the info row, no circle (cards stay uncluttered): on `/list` **unmarking removes the card** and rewrites the address bar (the card set *is* the URL), marking an unmarked card keeps it. The same toggle also appears on person filmography cards and search result rows (where cards never disappear — only the local mark flips). Marking from the search overlay *while viewing `/list`* fetches the `GET /list/card` fragment and appends the card right away.
-- **Title + bulk actions** (`marked.js`, from comparing the URL's ids to the local marks): the list is *yours* only when the visible card set **is** your marked set (a subset of your own marks still counts as a shared view) — title "Marked movies" + a **Clear all** chip (guarded by the browser's `confirm()`; on confirm it unmarks everything shown, empties the view, drops the stored name, URL → `/list`); otherwise it reads as a shared list — title "Shared list" + an **Add all to marked** chip (explicit opt-in — visiting someone's URL never imports their list into your marks). A cleared/empty list keeps the "Marked movies" title and hides all its chips (Share, Print, rename, bulk actions) — a global `[hidden] { display: none !important }` rule guarantees the hiding, since `.chip-button`'s own `display` would otherwise override the attribute; the empty state ("No marked movies yet…") is always rendered and revealed client-side.
-- **Custom name** — an optional `name={title}` query param, server-rendered (escaped, trimmed, capped at 60 chars) as the page title. A pencil button rendered **inside the title, right after the name** (a sibling flex item drifted mid-row: `.list-head` is `space-between`) starts an inline edit — clicking the title text works too (`cursor: pointer`, no button styling). The pencil reveals on hovering the title (or focusing it with the keyboard; `visibility` reserves its space so nothing shifts) and stays visible on touch, where there is no hover; Enter/blur commits, Escape cancels, empty input removes it. The input is aligned to the title text (negative margins cancel its border+padding, weight 700 matches the `h2`) so the edit starts in place with no jump. The refresh path (`marked.js`) must update only the inner `[data-list-title-text]` span — setting the `h2`'s `textContent` would wipe the pencil that lives inside it (seen in production as a never-appearing icon). Renaming your own list persists it in `localStorage` and keeps it in the URL, so the marked link, the share dialog and the QR all carry it; renaming someone else's shared list changes only the URL (handy for re-sharing under your own label, never touches the visitor's stored name). An empty list is not renameable (pencil hidden, `startNameEdit` guards too).
-- **Share** — one chip opening a native `<dialog>` (same `data-dialog` machinery as trailers) holding a QR of the *current* URL plus the URL as a real link (opens the list in a new tab) with a **Copy** chip beside it. The copy confirmation happens in the button itself — it flips to "Copied" (accent-colored) for 1.5 s on a fixed `min-width`, so the dialog never resizes; `aria-live` announces the change. The QR is generated client-side on every dialog open by the vendored `qrcode.js`. Client-side by design: the URL is browser-owned state (removals rewrite it via `history.replaceState`), and a server-side QR endpoint would be an open QR-generator abuse vector.
-- **Print** — a chip calling `window.print()`; the `@media print` stylesheet strips the chrome (header, search, buttons, footer, posters) and lays the movies out as clean rows (title left, year · duration right, hairline separators), page-break-safe, with print-only sub-lines per movie: original title (when distinct) and director(s) — carried by `MovieCardVm.originalTitle/directors`, populated from the movie detail (null for filmography cards).
-- Client behavior (`marked.js`): unmarking a card rewrites the address bar, so a refresh does not resurrect removed cards; following someone's shared URL never imports their list into the visitor's own marks (that's what **Add all to marked** is for — explicit opt-in — anonymous visitors merge into `localStorage`, signed-in visitors merge via the idempotent bulk `POST /marked?movie=…`).
-- **No anonymous notes**: notes are a signed-in feature — there is no client-side note machinery anymore, cards on `/list` and the movie page render the note affordance only for authenticated visitors (server-rendered). The loader still tolerates legacy `ekran.markedMovies` entries shaped `{movieId, note}` from the pre-detach format, but the note is ignored, and the old `ekran.movieNotes` local map is simply left behind.
-
-## `/marked` — signed-in marked movies
-
-The authenticated counterpart of the anonymous `/list`-as-marks flow (anonymous access redirects to `/signin`). Renders the server-side marked set as movie cards (capped like `/list` at 100 — one TMDB call per card) — same share/QR/print machinery (`shareUrl()` = `/list?movie=…`, so the shared URL works for anyone; notes never appear in shared URLs), plus Share/Print/**Move all to playlist** (the compose entry point — a **move**, see the compose workflow below)/Clear-all chips; no inline rename (the list name is the account's marks, not a named artifact). Clear-all bulk-`DELETE`s on the server after a `confirm()`. Cards do **not** disappear on unmark from the server's perspective the way `/list` cards rewrite the URL — `marked.js` runs its MARKED_PAGE mode there.
-- **Grid ⇄ Rows view** (`marked.js`, all four card lists — `/marked`, `/notes`, playlist detail, `/list`): a `Rows` chip in the actions row toggles the layout — the same card markup, a `data-view` attribute on `.movie-cards` switches it. Grid (default): poster columns (`minmax(124px, 1fr)`), note text clamped to 2 lines with `…` (long notes read badly at poster width — the clamp keeps them quiet). Rows: horizontal layout — 72px poster thumb on the left, title row and the note as free-wrapping text in a wide right column. The choice is remembered in `localStorage` (`ekran.cardsView`), re-applied on load and after boosted navigation; `/notes` server-renders `data-view="rows"` (rows are the better default for a text-first page) and a server-rendered view wins over the stored preference — only the toggle label syncs, the chip still works. Person filmography and search stay grid-only (no notes, no toggle). Print always falls back to its own layout (`display: block` in the print media block) regardless of the view.
-- **Movie note affordance**: every card carries a personal **movie note** area (`note-area.html` fragment): muted text under the info row plus a ✎ button that swaps in the inline `note-editor.html` form (`GET`/`POST /movies/{movieId}/note[/edit]`, htmx in-place swap of the whole `.card-note` area; ≤500 chars, trimmed, blank → removed; Escape cancels via the `data-note-cancel` button). The movie page shows the note in a `.movie-note` block under the actions row — **always rendered for signed-in visitors, marked or not** (notes are detached from marks: noting needs no mark, and unmarking or moving marks into playlists never touches the note; nothing to sync client-side on mark toggles); anonymous visitors get no note affordance. The **`n`** hotkey edits the note of the movie being viewed (physical key, ignored while editing text or with modifier keys, like `m`) — the movie page's affordance carries the `(n)` suffix in its label/title.
-
-## `/notes` — signed-in noted movies
-
-All the user's movie notes in one place: every movie with a note (`notedMovies(userId)`, capped like every card surface at 100 — one TMDB call per card), each card showing its note under the info row, with a direct `/movies/{movieId}/note/edit` link. **Rows is the server-rendered default** (`data-view="rows"` — a text-first page; the Grid chip switches, a server-rendered view beats the stored `ekran.cardsView` preference). Notes are detached from marks, so this list is independent of `/marked` — unmarked movies with notes appear here. The empty state points at the hotkey: "Open a movie and press n…". Reached from the account popup's `Notes · N` row (always visible, like `Playlists · N`).
-
-## `/playlists` — signed-in playlists
-
-PostgreSQL-backed named groups (`playlists` + `playlist_movies`, insert position preserved via `position = MAX+1`). Key behavior:
-
-- All operations take the userId from the session and are ownership-scoped in SQL; a foreign playlist id behaves as **404**, never as someone else's data.
-- Playlist names: trimmed, non-empty, ≤60 chars (duplicate names allowed — no uniqueness requirement).
-- Membership is independent of marks: unmarking never removes from a playlist; unmark ≠ remove — **except** the explicit compose workflow below.
-- The **Add to playlist / Edit** dialog (movie pages, `/list`, `/marked`) fetches `GET /playlists/select?movie=…`: a single movie shows a membership-toggle picker (checkbox chips that `POST`/`DELETE /playlists/{id}/movies/{movieId}` live, response swaps the fragment + OOB chip row), multiple movies show a bulk-add picker (pick buttons include the dialog's hidden movie inputs via `hx-include="closest .playlist-select"`). Each row in the toggle picker carries the membership's **note** (per-playlist, editable with the same `note-area`/`note-editor` machinery under `/playlists/{id}/movies/{movieId}/note[/edit]`); the bulk picker does not show notes (a bulk add only ever creates memberships). New playlists can be created right from the dialog (with the movie(s) included immediately; the pick-new form takes an optional description). Every bulk add — including playlist creation — starts memberships bare: playlist notes are written deliberately in the playlist, never inherited (re-adding an existing membership never overwrites its note). After a bulk add or a bulk-mode create the dialog **stays on the page it was opened from**: the fragment re-renders with a confirmation row ("Created X with N movies" / "Added N movies to X") plus an **Open playlist** link (`hx-boost="false"` — a deliberate full navigation), and the picker keeps its hidden movie set, so you can file the same movies into another playlist without re-opening anything — cleanup, if wanted, is the page's own Clear all, one click away. **This dialog is the only place membership changes from the movie page** — the movie page's chips row is links-only, so removing requires opening the dialog and un-checking (no accidental one-click removals).
-- Playlist index (`/playlists`): the header has just a **New** button — it reveals a hidden name row above the list (`data-new-playlist` / `data-new-playlist-form`, same toggle pattern as the rename form; the row has a name input plus an optional description input; Escape hides the row and refocuses the button). Create posts and navigates to the new playlist.
-- **Compose workflow** — the `/marked` dialog bulk-adds the visible cards (the client submits the visible card IDs, capped at 100 like every other surface — not a server-side "all marks"); creating a playlist from your marks (or bulk-adding them to an existing one) is a **move**: the marks clear — marks are the staging inbox, playlists the curated destination — while the user's movie notes stay on the movie pages (notes are never carried into memberships; playlist annotation is a deliberate act done in the playlist itself). You casually mark stuff, then sit down and compose — the notes you wrote along the way are still where you left them. Re-adding an existing membership never overwrites its note or position. Exactly one marked movie renders the toggle-mode dialog instead — that behaves like the movie-page toggle.
-- Playlist detail page (`/playlists/{id}`): an optional **description** under the title (`.playlist-desc`, muted small text, rendered only when present — the ✎ pencil is always there, same hidden-until-hover pattern as the rename pencil; it reveals the inline `data-desc-form` in place of the text, Enter/Save commits, Escape cancels; `POST /playlists/{id}/description`, ≤1000 chars, blank → none, editing touches `updated_at`), cards — each carrying its per-membership **note** under the info row (same `note-area`/`note-editor` machinery as movie notes; a membership note is independent of the movie's own note), **Reorder** (hidden when empty — a `data-reorder-toggle` chip that flips the section into reorder mode: per-card `‹ ›` overlays (`card-move`, rendered only here via the `card(c, playlistId)` fragment param — other card surfaces pass `null` and never see them) appear over the posters, the button relabels to **Done**, Escape exits and refocuses. Each arrow posts `POST /playlists/{id}/movies/{movieId}/move` with `dir=up|down` (`hx-swap="none"`): the server swaps the row's `position` with its neighbor — **wrapping at the edges** (first up → last via `position = MAX+1`, last down → first via `position = MIN−1`), no-op for unknown movies or single-card playlists — and returns an empty 200; `marked.js` mirrors the move in the DOM (`htmx:afterRequest` → swap the two `<li>`s, or jump to the other end) so no cards are re-fetched. Because the edges wrap, both arrows are always live — no boundary-disabled states. Reordering also rebuilds the share dialog's `data-share-url` movie params from the live card order, so a later Share carries the new order. Since `(playlist_id, position)` is UNIQUE, an adjacent swap steps through a temporary `MAX+1` position inside the transaction), Rename (a pencil inside the title, same as `/list` — hidden until the title is hovered/focused, always visible on touch; it reveals the inline form **in place of the title**: the `h2` hides and the form takes its left slot in the `space-between` row, the input styled like `.list-name-input` so the edit starts where the name was; Enter/Save submits, Escape cancels and restores the title), Delete (**`hx-confirm`** — boosted forms bypass native `onsubmit` confirm), **Share** — opens the QR dialog directly; the dialog carries `data-share-url` with the playlist's `/list?movie=…&name=…` URL (`marked.js` absolutizes and renders/copies it), so the shared page is the same public snapshot with no playlist-specific URLs — descriptions and membership notes are private and never travel in it, Print. The sign-in/`next` continuation is the plain path everywhere except `/list`, where the query string is the content.
-- Navigation mutations answer `HX-Redirect` (200 + header) for fetch/dialog flows and 303 for plain/boosted forms — except the bulk dialog's add/create, which stays in place and re-renders the fragment with a confirmation instead.
-
-## `/persons/{tmdbId}` and department variants
-
-One TMDB call (`/person/{id}` with `append_to_response=movie_credits` — see `tmdb-integration.md`).
-
-Layout:
-
-- Name, known-for department (e.g. "Known for Directing").
-- Life dates when TMDB has them: "Born November 30, 1937" for living people, "August 28, 1925 – September 27, 2003" for deceased (`PersonPageVm.lifeDates`, full month names, en dash).
-- No biography: person pages are for the filmography, the bio text was noise; TMDB has it, we deliberately drop it.
-- Filmography — grouped sections by department, each rendered as the shared movie-card grid (`movie-card.html`, same cards as `/list`, minus the remove action): poster, title, year — and no role line (the section heading already says Directing/Writing/Acting, and repeating `Director` on every card was noise). Duration is deliberately not shown: TMDB's person-credits payload has no `runtime`, and fetching it per credit would cost one detail call per movie (a busy person = 50–100+ calls per page, against the one-call-per-page rule).
-- Filmography lists are sorted by release year descending; undated items go last. Duplicate movies across departments stay in each relevant section.
-- Every movie title links to `/movies/{id}`.
-
-### Department pages `/persons/{tmdbId}/{department}`
-
-- `{department}` ∈ {`directing`, `acting`, `writing`}.
-- Same header (name, known-for), then **only** the requested section, full-length.
-- Navigation tabs/links between `All | Directing | Acting | Writing` with the current one marked — these are plain links (server-rendered), deep-linkable.
-- Unknown department → 404.
-- Rationale for dedicated URLs: brief §7 requires them, and they give Google-friendly canonical pages per craft. Implementation may share one template with a section selector.
-
-## View models
-
-Templates never receive domain models with TMDB-shaped leftovers. `web/viewmodels` provides:
-
-- `SearchResultsVm` — `query`, `List<ResultItemVm>` (title, `originalTitle` nulled by the view model when same-as/blank, subtitle, year, imageUrl, href; `tmdbId` null ⇒ person ⇒ no mark toggle); produced for both `MOVIE` and `PERSON` search types (`type` query param, home toggle).
-- `MovieDetailVm` — preformatted fields (runtime as `1h 52m`, joined genres, resolved poster/backdrop URLs, `fullPosterUrl` — the poster path at TMDB's `original` size for the poster dialog — plus `List<PersonLinkVm> directors/writers/cast` with `name, role, href`), plus `List<VideoVm> videos` (`key, name, type`) ranked best-first by `rankVideos` (see `/movies/{tmdbId}`), so templates stay logic-free.
-- `PersonPageVm` — name, knownFor, lifeDates (formatted birth/death dates), filmography sections of `MovieCardVm`s, current department for tab highlighting.
-- `MovieCardVm` — the one shared card shape (`tmdbId, title, year, meta, originalTitle, directors, posterUrl`) with two factories: `of(Movie)` for `/list` (meta = formatted duration, directors joined, original title for the print sub-line) and `of(FilmographyItem)` for person filmography grids (meta/originalTitle/directors = null — see the runtime note there); `MovieDetailVm` carries its own `tmdbId` for the mark button's `data-movie-id`.
-
-All image URLs are absolute (resolved in the tmdb adapter) — templates contain no TMDB URL-construction logic.
-
-## Footer — TMDB attribution
-
-Every full page (home, movie, person, error) includes a shared footer fragment (`templates/footer.html`):
-
-> Ekran uses the TMDB API but is not endorsed or certified by TMDB. **[TMDB logo →](https://www.themoviedb.org/)**
-
-The logo is the official TMDB mark, vendored locally at `static/img/tmdb-logo.svg` (fetched from themoviedb.org brand assets — no third-party request at runtime), and links to https://www.themoviedb.org/. Required by TMDB's attribution terms.
-
-## Error pages
-
-- `404` — movie/person not found in TMDB, or bad department path. Simple page with the search box front and center.
-- `503` — TMDB unavailable/timeout: "Search is temporarily unavailable" with a retry hint. Fragment mode returns a fragment with the same message.
-- `500` — unexpected: generic message, server logs the detail. Never expose TMDB JSON or stack traces to the client.
-
-## Static assets
-
-Served from `src/main/resources/static/`:
-
-- **Cache policy:** every response — rendered pages and static assets — is served with `Cache-Control: no-cache` (always revalidate, cheap 304s via ETag). Explicit revalidation is required: Javalin/Jetty's default static header is `max-age=0` paired with a fake 1980 `Last-Modified`, and browsers (notably Safari) then apply heuristic caching that serves stale JS long after a deploy — a stale `search.js` against fresh markup breaks the trailers dialog and the mobile overlay-tap fix (symptoms seen in production: the Trailers link navigating to YouTube, overlay taps not following links).
-- `/css/app.css` — single lightweight local stylesheet, no framework, basic system font stack. No design polish in Step 1.
-- `/js/htmx.min.js` — vendored HTMX (see `search-interaction.md` for version pinning).
-- `/js/search.js` — first-party JS (~280 lines: hotkeys, Escape, overlay close, mobile tap completion, keyboard result navigation, movies/people toggle, native-dialog handling, video-list selection).
-- `/js/marked.js` — marking/list client (~720 lines: localStorage store for anonymous mode + server-backed mode when the `data-marked-ids` auth seed is present, local→server migration on first authed load, mark toggles on the movie page/cards/search results, marked count/link, `/list` + `/marked` titles and bulk actions, confirmed clear, share dialog, QR render, URL sync, print, playlist reorder mode with DOM-swap moves), loaded (deferred) on every page.
-- `/js/qrcode.js` — vendored `qrcode-generator` 1.4.4 (kazuhikoarase, MIT; auto type, SVG output), loaded only by the pages with a Share dialog: `/list`, `/marked`, playlist detail.
-- `/favicons/` — vendored favicon set (ico + PNG sizes + webmanifest); linked from the shared `head` fragment.
-- `/img/tmdb-logo.svg` — vendored TMDB logo for the attribution footer.
-
-No CDN references anywhere (sole deliberate exception: the `youtube-nocookie.com` iframe inside the trailers dialog, fetched when the dialog opens — see `/movies/{tmdbId}`). App JS is minimal: vendored `htmx.min.js` plus two small first-party files, `/js/search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap completion, keyboard result navigation, movies/people toggle, native-dialog open/close, video-list selection) and `/js/marked.js` (~720 lines: mark storage/toggle everywhere, marked-link sync, list title/custom name/bulk actions, confirmed clear, share dialog, print, playlist reorder mode), plus the QR library on `/list` only. Pages must render and remain navigable (search box visible, links clickable) even if JS fails to load — progressive enhancement baseline: without JS the search input simply does nothing dynamic, and all links work as plain links.
+- Every page carries the TMDB attribution footer (vendored logo, link to themoviedb.org) —
+  required by TMDB's terms.
+- Errors: 404 (not found / bad department) with the search box front and center; 503
+  ("temporarily unavailable") page or fragment; 500 generic. Never raw TMDB/internal
+  errors.
+- Static assets served with `Cache-Control: no-cache` (always revalidate, ETag 304s) —
+  explicitly required: Javalin's default static headers let browsers apply heuristic
+  caching and serve stale JS against fresh markup, which breaks the dialogs and overlay
+  taps.
+- JS is vendored `htmx.min.js` (2.0.4) + `search.js` + `marked.js`, loaded deferred;
+  `qrcode.js` (vendored qrcode-generator) only on pages with a Share dialog. No CDN
+  references (sole exception: the trailers-dialog YouTube iframe).

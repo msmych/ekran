@@ -98,6 +98,22 @@ class PgPlaylistsRepositoryTest {
     }
 
     @Test
+    void indexRowsCarryDescriptionAndOrderedMovieIds() {
+        var userId = authRepository.insertUser("index@bar.com");
+        var id = repository.createPlaylist(userId, "Sci-fi", "Cowboys in orbit");
+
+        repository.addMovies(userId, id, notes(680L, 238L, 155L));
+        repository.updateDescription(userId, id, null);
+
+        assertThat(repository.playlists(userId)).singleElement()
+            .satisfies(p -> {
+                assertThat(p.description()).isNull();
+                assertThat(p.movieCount()).isEqualTo(3);
+                assertThat(p.movieIds()).containsExactly(680L, 238L, 155L);
+            });
+    }
+
+    @Test
     void deletingPlaylistDeletesMemberships() {
         var userId = authRepository.insertUser("cascade@bar.com");
         var id = repository.createPlaylist(userId, "Doomed", null);

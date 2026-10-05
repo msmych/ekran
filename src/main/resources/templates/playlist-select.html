@@ -18,11 +18,11 @@
     </div>
     <ul class="playlist-picker">
         <li th:each="m : ${memberships}">
-            <th:block th:if="${movieId != null}">
+<th:block th:if="${movieId != null}">
 <button th:if="${m.member()}" type="button" class="pick on"
-                         th:attr="hx-delete='/playlists/' + ${m.id} + '/movies/' + ${movieId}"
-                         hx-target="#playlist-select-body"
-                         hx-swap="innerHTML">
+                          th:attr="hx-delete='/playlists/' + ${m.id} + '/movies/' + ${movieId}"
+                          hx-target="#playlist-select-body"
+                          hx-swap="innerHTML">
                     <span class="pick-name" th:text="${m.name}">Favorites</span>
                     <span class="pick-mark" aria-hidden="true"><th:block th:replace="~{check-icon :: icon}"></th:block></span>
                 </button>
@@ -31,6 +31,7 @@
                         hx-target="#playlist-select-body"
                         hx-swap="innerHTML">
                     <span class="pick-name" th:text="${m.name}">Favorites</span>
+                    <span class="pick-add" aria-hidden="true">+</span>
                 </button>
             </th:block>
             <th:block th:if="${movieId == null}">
@@ -40,6 +41,7 @@
                         hx-target="#playlist-select-body"
                         hx-swap="innerHTML">
                     <span class="pick-name" th:text="${m.name}">Favorites</span>
+                    <span class="pick-add" aria-hidden="true">+</span>
                 </button>
             </th:block>
             <!-- the membership's own note, editable in place -->

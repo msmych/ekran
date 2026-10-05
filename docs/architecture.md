@@ -1,134 +1,76 @@
 # Architecture
 
+A fast, no-bloat movie discovery web app: open the site, search immediately, results appear
+as you type, open a movie, jump to a person's filmography. No social layer, reviews,
+recommendations, or ads. Success criterion: empty browser tab → relevant movie/person info
+with near-zero waiting or interaction.
+
 ## Layering
 
 ```
-Browser (HTML + HTMX)
-  ↓ HTTP
-web          — Javalin routes/controllers, request handling, view models, error pages
+web        Javalin routes, view models, Thymeleaf templates, auth session middleware
   ↓
-service      — search / movie / person application logic
+service    search / movie / person logic            marks / playlists / auth services
   ↓
-repository   — interfaces for movie/person/credit retrieval
+repository interfaces (domain types)                marks / playlists / auth repos (JDBC)
   ↓
-tmdb         — TMDB client, API DTOs, mapping into domain models
-               (MVP)  →  later: PostgreSQL + TMDB refresh (Step 2)
+tmdb       TMDB client, DTOs, mapping               db: migrations + Hikari pool
 ```
 
-Dependencies point strictly downward. **Nothing outside the `tmdb` package may import a TMDB DTO.**
+Dependencies point strictly downward. **Nothing outside the `tmdb` package may import a TMDB
+DTO** — repositories speak domain types (`Movie`, `Person`, `Filmography`, `SearchResult`),
+TMDB concepts (`poster_path`, `append_to_response`, `known_for`) are translated at the
+boundary, and image URLs are resolved to absolute URLs in the adapter. This is what keeps a
+future PostgreSQL-backed store a drop-in replacement. The repository interfaces are
+deliberately minimal: `search(query, page, type)`, `findById(tmdbId)`.
 
-## Package boundaries
-
-Root package: `uk.matvey.ekran`.
+## Packages
 
 ```
 uk.matvey.ekran
-├── Main                    — entry point: config load, wiring, Javalin bootstrap
-├── config/                 — AppConfig (env parsing, validation)
-├── web/                    — routes, per-request handling, view models
-│   ├── SearchRoutes        — / and /search
-│   ├── MovieRoutes         — /movies/{id}
-│   ├── PersonRoutes        — /persons/{id}, /persons/{id}/{department}
-│   ├── ListRoutes          — /list, /list/card (public shared-list snapshot)
-│   ├── AuthRoutes          — /signin, /auth/link, /signout, /account (magic-link auth)
-│   ├── MarkedRoutes        — /marked and the mark-sync endpoints (authed)
-│   ├── PlaylistRoutes      — /playlists CRUD + membership (authed)
-│   ├── viewmodels/         — SearchResultsVm, MovieDetailVm, PersonPageVm, FilmographySectionVm, MovieCardVm, ResultItemVm, OgVm, …
-│   └── EkranApp            — app assembly, error handlers → friendly error fragments/pages
-├── auth/                    — magic-link tokens, server-side sessions, rate limiting (JDBC)
-├── marks/                   — MarksService, MarksRepository → PgMarksRepository (marked_movies)
-├── playlists/               — PlaylistsService, PlaylistsRepository → PgPlaylistsRepository (playlists, playlist_movies)
-├── service/
-│   ├── SearchService       — query validation, movie search
-│   ├── MovieService        — movie detail assembly
-│   └── PersonService       — person + filmography assembly, department grouping
-├── domain/                 — application-level models
-│   ├── Movie, Person, Credit, Department, Filmography, SearchResult
-├── repository/             — interfaces only
-│   ├── MovieRepository
-│   ├── PersonRepository
-│   └── SearchRepository
-├── db/                     — DbMigrations (V<n>.sql runner), DataSources (Hikari)
-└── tmdb/
-    ├── TmdbClient          — HTTP, auth, timeouts, retries-as-configured
-    ├── TmdbMovieRepository — implements MovieRepository
-    ├── TmdbPersonRepository— implements PersonRepository
-    ├── TmdbSearchRepository— implements SearchRepository
-    ├── dto/                — Jackson DTOs mirroring TMDB responses (package-private reach)
-    └── TmdbMapper          — DTO → domain mapping
+├── Main          config load, wiring, Javalin bootstrap (migrations run at startup)
+├── config/       AppConfig — pure function of env, fail-fast validation, no secrets in toString
+├── web/          *Routes, EkranApp (error handlers), viewmodels/
+├── auth/         magic-link tokens (SHA-256, TTL, single-use), sessions, rate limiting
+├── marks/        MarksService → PgMarksRepository (marked_movies)
+├── playlists/    PlaylistsService → PgPlaylistsRepository (playlists, playlist_movies)
+├── email/        EmailService → ResendEmailService
+├── service/      SearchService, MovieService (+ Caffeine cache), PersonService
+├── domain/       Movie, Person, Filmography, SearchResult, Department, MovieNote, …
+├── repository/   interfaces only
+├── db/           DbMigrations (V<n>.sql runner), DataSources (Hikari)
+└── tmdb/         TmdbClient, dto/, TmdbMapper, repository impls
 ```
 
-## Key architectural rule
+No DI framework — `Main` constructs the graph manually; it is small enough to be explicit.
 
-> **Do not leak TMDB DTOs beyond the TMDB adapter.**
+## Technology
 
-The application depends on its own small domain/view models. This prevents TMDB's API structure from becoming the application's architecture and makes PostgreSQL or another provider replaceable later (see `data-model.md`).
+| Concern | Choice |
+|---|---|
+| JVM / build | Java 25, Gradle `application` plugin |
+| Server | Javalin 6.x — no Spring |
+| Rendering | Thymeleaf (`javalin-rendering`) |
+| Frontend | Server-rendered HTML + vendored HTMX 2.0.4 + `search.js` / `marked.js`; no framework, no bundler |
+| JSON | Jackson |
+| HTTP out | `java.net.http.HttpClient` (shared, timeouts, HTTP/2) |
+| Persistence | PostgreSQL + Flyway-style `V<n>.sql` migrations run at startup |
+| Logging | SLF4J + Logback; no secrets, no query strings in logs |
+| Tests | JUnit 5, AssertJ, MockWebServer, Testcontainers |
 
-Consequences:
+## Performance rules
 
-- `tmdb.dto` types are not referenced by `web`, `service`, or `domain` — enforced by code review and optionally by a ArchUnit rule (`noClasses().that().resideOutsideOfPackage("..tmdb..").should().dependOnClassesThat().resideInAPackage("..tmdb.dto..")`).
-- Repository interfaces speak domain types (`Movie`, `Person`, `Filmography`, `SearchResult`).
-- TMDB-specific concepts (e.g. `known_for`, `append_to_response`, `poster_path`) are translated at the boundary: `poster_path` becomes a resolved absolute image URL in the domain object, so the domain layer never knows TMDB image conventions.
+- One TMDB call per page view (search, movie, person); list surfaces go through the
+  `MovieService` Caffeine cache (24 h, 10k entries) — see `tmdb-integration.md`.
+- Search fragment responses carry `Cache-Control: no-store`; everything else is
+  `no-cache` (always revalidate — see `routes-and-views.md`, static assets).
+- No blocking third-party assets (sole exception: the trailers-dialog YouTube iframe,
+  fetched only while the dialog is open).
+- Pages render and stay navigable with JS failed to load — progressive enhancement baseline.
 
-## Repository interfaces
+## Errors
 
-Deliberately minimal — the smallest surface the UI needs today:
-
-```java
-public interface SearchRepository {
-    SearchResultPage search(String query, int page, SearchType type);   // MOVIE | PERSON
-}
-
-public interface MovieRepository {
-    Optional<Movie> findById(long tmdbId);
-}
-
-public interface PersonRepository {
-    Optional<Person> findById(long tmdbId);              // includes credits for filmography
-}
-```
-
-`SearchResultPage` carries domain `SearchResult` items (see `data-model.md`). Search takes a type (movie or person — the home Movies/People toggle, `type=person` deep links) and costs exactly one TMDB call per search. If movies and persons ever need to be blended into one result list, the adapter can merge two parallel TMDB calls deterministically, or a later PostgreSQL-backed merge can do it — `SearchService` and the routes should not need to change shape.
-
-## Wiring
-
-No DI framework. `Main` constructs the graph manually — it is small enough to be explicit:
-
-```
-AppConfig ← env
-HttpClient (shared, time-limits configured)
-TmdbClient(config, httpClient)
-Tmdb{Search,Movie,Person}Repository(tmdbClient)
-{Search,Movie,Person}Service(repositories)
-Javalin with routes(services, thymeleaf)
-```
-
-## Technology choices
-
-| Concern | Choice | Reason |
-|---|---|---|
-| JVM | Java 25 (LTS) | Locked decision |
-| HTTP server | Javalin 6.x | Lightweight, no Spring, simple routing, good static-file support |
-| Rendering | Thymeleaf 3.x via `javalin-rendering` | HTML-natural templates, mature, no client framework |
-| JSON | Jackson (databind + jdk8/params-names as needed) | Required for TMDB responses |
-| Logging | SLF4J + Logback | Locked decision; simple console/file config, no ceremony |
-| Outbound HTTP | `java.net.http.HttpClient` | Zero extra dependency, supports connect timeout, connection reuse, and per-request timeouts |
-| Frontend behavior | HTMX (vendored `htmx.min.js` in `static/`) + two first-party files: `search.js` (~280 lines: hotkeys, Escape semantics, overlay close, mobile tap-through, keyboard result nav, native-dialog handling) and `marked.js` (~660 lines: mark storage, list actions, share/QR) | No blocking third-party assets; progressive enhancement baseline |
-| Build | Gradle, `application` plugin | Locked decision |
-| Tests | JUnit 5, AssertJ, MockWebServer (OkHttp) or similar stub HTTP server | Mockable TMDB, no real API key |
-
-## Performance posture
-
-- Homepage renders immediately; search input ready for typing (autofocus, zero JS required to show the page).
-- No blocking third-party assets, advertising, analytics.
-- Search response returns only the HTML fragment needed for the result list.
-- Avoid duplicate TMDB calls within a single request (e.g. movie detail fetches movie + credits in one `append_to_response` call; person page fetches person + credits in one call).
-- Outbound HTTP with connection reuse and explicit timeouts.
-- Stale search responses must not replace current results (see `search-interaction.md`).
-- Design so local caching/storage (Step 2) can later reduce external latency — the repository boundary is the seam.
-
-## Error handling strategy
-
-- TMDB errors (5xx, timeouts, malformed JSON) are caught in the `tmdb` package and translated into application-level exceptions (`TmdbUnavailableException`, `NotFoundException`).
-- Routes map those to friendly pages/fragments (HTTP 500/503/404) — TMDB/internal stack traces never reach the browser.
-- See `configuration-and-ops.md` for logging rules (no secrets in logs).
+The `tmdb` package translates HTTP failures into typed exceptions:
+404 → `NotFoundException`, 401/403 → `TmdbAuthException` (logged without token content),
+5xx/timeout/malformed JSON → `TmdbUnavailableException`. Routes map them to friendly
+pages/fragments (404/503/500); stack traces and TMDB payloads never reach the browser.

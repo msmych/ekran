@@ -71,9 +71,9 @@ class RoutesTest {
         LocalDate.parse("1937-11-30"), null,
         URI.create("https://img/profile.jpg"),
         new Filmography(
-            List.of(new FilmographyItem(348, "Alien", 1979, URI.create("https://img/alien-card.jpg"))),
+            List.of(new FilmographyItem(348, "Alien", LocalDate.parse("1979-05-25"), URI.create("https://img/alien-card.jpg"))),
             List.of(),
-            List.of(new FilmographyItem(500, "Some Cameo", 1990, null))
+            List.of(new FilmographyItem(500, "Some Cameo", LocalDate.parse("1990-01-01"), null))
         )
     );
 
@@ -119,7 +119,7 @@ class RoutesTest {
             assertThat(body).contains("class=\"site-search\"");
             assertThat(body).contains("id=\"search-overlay\"");
             assertThat(body).contains("hx-get=\"/search\"");
-            assertThat(body).contains("hx-target=\"#search-overlay\"");
+            assertThat(body).contains("hx-target=\"#overlay-results\"");
             assertThat(body).doesNotContain("autofocus");
             assertThat(body).doesNotContain("hx-push-url");
         });
@@ -187,7 +187,7 @@ class RoutesTest {
             var body = response.body().string();
             assertThat(body).contains("is a fast movie search app");
             assertThat(body).contains("href=\"https://matvey.uk\"");
-            assertThat(body).contains("hx-target=\"#search-overlay\"");
+            assertThat(body).contains("hx-target=\"#overlay-results\"");
             assertThat(body).contains("not endorsed or certified by TMDB");
         });
     }
@@ -322,13 +322,26 @@ class RoutesTest {
     }
 
     @Test
-    void nonHomePagesCarryNoTypeToggle() {
+    void nonHomePagesCarryTypeToggleDefaultingToMovies() {
         JavalinTest.test(app(), (server, http) -> {
             var body = http.get("/movies/348").body().string();
 
-            assertThat(body).doesNotContain("search-toggle");
-            assertThat(body).doesNotContain("id=\"search-type\"");
+            assertThat(body).contains("search-toggle");
+            assertThat(body).contains("id=\"search-type\"");
+            assertThat(body).contains("hx-include=\"#search-type\"");
             assertThat(body).contains("placeholder=\"Search movies…\"");
+        });
+    }
+
+    @Test
+    void personPagesDefaultOverlaySearchToPeople() {
+        JavalinTest.test(app(), (server, http) -> {
+            var body = http.get("/persons/1").body().string();
+
+            assertThat(body).contains("placeholder=\"Search people…\"");
+            assertThat(body).contains("value=\"person\"");
+            // the People pill is the active one in the overlay panel
+            assertThat(body).contains("data-search-type=\"person\" class=\"active\"");
         });
     }
 
@@ -796,8 +809,11 @@ class RoutesTest {
             assertThat(body).contains("href=\"/persons/1/directing\"");
             assertThat(body).contains("href=\"/persons/1/acting\"");
             assertThat(body).contains("href=\"/persons/1/writing\"");
+            assertThat(body).contains("href=\"/persons/1/all\"");
 assertThat(body).contains("href=\"/movies/348\"");
             assertThat(body).contains("https://img/alien-card.jpg");
+            // known-for default: only the Directing section, the acting cameo is filtered out
+            assertThat(body).doesNotContain("Some Cameo");
             assertThat(body).contains("class=\"movie-cards\"");
             assertThat(body).contains("href=\"https://www.themoviedb.org/person/1\"");
             assertThat(body).contains("data-card-mark=\"348\"");
@@ -834,6 +850,19 @@ assertThat(body).contains("href=\"/movies/348\"");
             var body = response.body().string();
             assertThat(body).contains("Some Cameo");
             assertThat(body).doesNotContain("<h3>Directing</h3>");
+        });
+    }
+
+    @Test
+    void personAllPageShowsEverySection() {
+        JavalinTest.test(app(), (server, http) -> {
+            var response = http.get("/persons/1/all");
+
+            assertThat(response.code()).isEqualTo(200);
+            var body = response.body().string();
+            assertThat(body).contains("<h3>Directing</h3>");
+            assertThat(body).contains("Alien");
+            assertThat(body).contains("Some Cameo");
         });
     }
 

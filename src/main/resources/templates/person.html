@@ -18,13 +18,12 @@
             </div>
         </header>
         <nav class="tabs">
-            <a th:href="${'/persons/' + vm.tmdbId()}"
-               th:classappend="${vm.currentDepartment() == null} ? current"
-               th:text="'All'">All</a>
             <a th:each="d : ${vm.departments()}"
                th:href="${'/persons/' + vm.tmdbId() + '/' + d.key()}"
                th:classappend="${vm.currentDepartment() == d.key()} ? current"
                th:text="${d.label()}">Directing</a>
+            <a th:href="${'/persons/' + vm.tmdbId() + '/all'}"
+               th:classappend="${vm.currentDepartment() == null} ? current">All</a>
         </nav>
         <section class="filmography" th:each="s : ${vm.sections()}">
             <h3 th:text="${s.label()}">Directing</h3>

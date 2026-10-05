@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import uk.matvey.ekran.domain.MovieIds;
 import uk.matvey.ekran.domain.MovieNote;
 import uk.matvey.ekran.domain.NotFoundException;
 
@@ -27,7 +28,11 @@ public class InMemoryPlaylistsRepository implements PlaylistsRepository {
         return playlists.values().stream()
             .filter(p -> p.userId() == userId)
             .sorted((a, b) -> Long.compare(b.updatedAt(), a.updatedAt()))
-            .map(p -> new Playlist(p.id(), p.name(), positionsOf(p.id()).size()))
+            .map(p -> {
+                var ids = movieIdsOf(p.id());
+                return new Playlist(p.id(), p.name(), p.description(), ids.size(),
+                    ids.stream().limit(MovieIds.MAX_SET).toList());
+            })
             .toList();
     }
 

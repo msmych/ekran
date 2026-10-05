@@ -3,6 +3,7 @@
 <head th:replace="~{head :: head('Playlists — ekran')}"></head>
 <body>
 <div id="topbar" class="htmx-indicator" aria-hidden="true"></div>
+<script defer src="/js/qrcode.js"></script>
 <main class="wrap" hx-boost="true" hx-indicator="#topbar">
     <div th:replace="~{header :: header(false)}"></div>
     <section class="marked-list">
@@ -19,16 +20,33 @@
         </form>
         <ul class="playlist-index">
             <li th:each="p : ${playlists}">
-                <a th:href="'/playlists/' + ${p.id}">
-                    <span class="playlist-name" th:text="${p.name}">Favorites</span>
-                    <span class="playlist-count" th:text="${p.movieCount} + ' movie' + (${p.movieCount} == 1 ? '' : 's')">12 movies</span>
-                </a>
+                <!-- quick actions ride the row: Share opens the dialog with this
+                     playlist's /list snapshot URL, Delete is the same guarded
+                     form as the detail page's chip -->
+                <div class="playlist-row">
+                    <a class="playlist-row-main" th:href="'/playlists/' + ${p.id}">
+                        <span class="playlist-name" th:text="${p.name}">Favorites</span>
+                        <span class="playlist-row-desc" th:if="${p.description != null}"
+                              th:text="${p.description}">Description</span>
+                        <span class="playlist-count" th:text="${p.movieCount} + ' movie' + (${p.movieCount} == 1 ? '' : 's')">12 movies</span>
+                    </a>
+                    <div class="playlist-row-actions">
+                        <button type="button" class="chip-button" data-dialog="share"
+                                th:hidden="${p.movieCount == 0}"
+                                th:attr="data-share-url=@{/list(movie=${p.movieIds},name=${p.name})}">Share</button>
+                        <form method="post" th:action="'/playlists/' + ${p.id} + '/delete'"
+                              hx-confirm="Delete this playlist? Its movies stay in your marks.">
+                            <button type="submit" class="chip-button danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
             </li>
         </ul>
         <div class="empty-list" th:hidden="${!playlists.isEmpty()}">
             <p>No playlists yet.</p>
             <p>Create one to group movies you want to keep together.</p>
         </div>
+        <th:block th:replace="~{share-dialog :: shareDialog(null)}"></th:block>
     </section>
 </main>
 <footer th:replace="~{footer :: footer}"></footer>

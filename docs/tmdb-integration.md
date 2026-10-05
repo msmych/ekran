@@ -1,91 +1,49 @@
 # TMDB Integration
 
-Everything TMDB-specific lives in the `tmdb` package. Nothing outside it knows TMDB exists.
+Everything TMDB-specific lives in the `tmdb` package; nothing outside it knows TMDB
+exists. When an endpoint or response shape is uncertain, consult current TMDB docs —
+API-specific assumptions stay inside the adapter.
 
-## Authentication
+## Auth and endpoints
 
-- **v4 Bearer token**, passed as `Authorization: Bearer <token>` header (no `api_key` query param).
-- Env var: `TMDB_API_TOKEN`. Never committed, never logged. App fails fast at startup with a clear message if unset.
-- TMDB account/app settings stay out of the codebase entirely.
+- v4 Bearer token via `Authorization` header; env `TMDB_API_TOKEN` (never committed,
+  never logged; fail-fast at startup when missing).
+- **One TMDB call per page view**, kept at one via `append_to_response`:
 
-## Base endpoints used (TMDB API v3 REST surface)
+| Purpose | Endpoint |
+|---|---|
+| Movie search | `GET /search/movie?query={q}&include_adult=false&page=1` |
+| Person search | `GET /search/person?query={q}&include_adult=false&page=1` |
+| Movie detail | `GET /movie/{id}?append_to_response=credits,videos&language=en-US` |
+| Person + credits | `GET /person/{id}?append_to_response=movie_credits&language=en-US` |
 
-| Purpose | Endpoint | Notes |
-|---|---|---|
-| Movie search | `GET /3/search/movie?query={q}&include_adult=false&page=1` | Home default |
-| Person search | `GET /3/search/person?query={q}&include_adult=false&page=1` | Home Movies/People toggle (`type=person`) |
-| Movie detail + credits | `GET /3/movie/{id}?append_to_response=credits,videos&language=en-US` | **single** call per movie page |
-| Person + film credits | `GET /3/person/{id}?append_to_response=movie_credits&language=en-US` | **single** call per person page |
+- `language=en-US` fixed. HTTP via one shared `java.net.http.HttpClient`: connect timeout
+  2 s, request timeout 3 s (search) / 5 s (detail), no retries — failures surface as 503.
+- Non-2xx → typed errors: 404 `NotFoundException`, 401/403 `TmdbAuthException` (logged
+  without token), 5xx/timeout/garbage `TmdbUnavailableException`.
 
-- One request per page view, enforced: movie page = 1 TMDB call, person page = 1 TMDB call, search = 1 TMDB call (movie or person, per the requested type). No duplicate TMDB calls within a single request.
-- `language=en-US` fixed for MVP (no localization work).
-- `append_to_response` is the tool that keeps call counts at 1 — this is a TMDB-adapter-internal detail; the repository interface stays `findById`.
+## Caching
 
-## Caching (`MovieService`)
-
-TMDB has no batch "details by ids" endpoint, so list surfaces (`/list`, `/marked`, playlists)
-would otherwise pay one sequential detail call per card — up to `MovieIds.MAX_SET = 100`.
-`MovieService` wraps the repository with a Caffeine cache keyed by TMDB id
-(24 h expiry, 10 000 entries):
-
-- movie metadata is immutable for all practical purposes — the day-long TTL is safe;
-- a cold list page is bounded by cache misses alone; repeat visits are instant;
-- a missing movie still surfaces as `NotFoundException` → 404 (the cache stores
-  `Optional<Movie>`, exceptions are unwrapped and propagate as themselves).
+TMDB has no batch-details endpoint, so list surfaces would pay one detail call per card
+(up to 100). `MovieService` wraps the repository with a Caffeine cache keyed by TMDB id
+(24 h expiry — movie metadata is effectively immutable; 10 000 entries). A missing movie
+still surfaces as `NotFoundException` → 404.
 
 ## Images
 
-- TMDB returns relative paths (`poster_path: "/abc.jpg"`); the adapter resolves them to absolute URLs at mapping time: `https://image.tmdb.org/t/p/{size}{path}`.
-- Sizes used: `w92` (search thumbs), `w185` (filmography/list cards), `w342` (movie poster), `h632` (person profile), `w780` (backdrop). Base image URL is config (`TMDB_IMAGE_BASE_URL`, default `https://image.tmdb.org/t/p`; see `configuration-and-ops.md`).
-- Null/absent paths map to `null` in domain; templates render a CSS placeholder.
+- Relative paths resolved to absolute URLs at mapping time:
+  `{TMDB_IMAGE_BASE_URL}/{size}{path}` (base is config).
+- Sizes: `w92` search thumbs, `w185` cards, `w342` movie poster, `h632` person profile,
+  `w780` backdrop (OG image). Null paths → `null` in domain → CSS placeholder.
 
-## HTTP client
+## DTOs and mapping (`tmdb.dto`, `TmdbMapper`)
 
-`java.net.http.HttpClient`, one shared instance:
-
-- Connect timeout: configurable, default 2 s.
-- Request timeout (per call): default 3 s for search, 5 s for detail pages (TMDB + credits responses are larger).
-- HTTP/2 with connection reuse by default.
-- No retries in MVP (beyond what a single manual retry could fix, retries add tail latency; error is surfaced as 503). Revisit in Step 2 with the local store.
-- Treat non-2xx as typed errors:
-  - 404 → `NotFoundException` (domain object genuinely absent)
-  - 401/403 → `TmdbAuthException` (config problem — logged with **no token content**, surfaced as 503)
-  - 5xx / timeout / IO / malformed JSON → `TmdbUnavailableException`
-
-## DTO layer (`tmdb.dto`)
-
-Jackson-mapped, package-reachable only from within `tmdb`:
-
-- `MovieSearchResponse { page, results: List<MovieSearchItem> }`
-- `MovieDetailResponse` (title, original_title, release_date, runtime, genres[], vote_average, overview, poster_path, backdrop_path, original_language, credits: `CreditsResponse{crew[], cast[]}`, videos: `VideosResponse{results[]}`)
-- `VideoItem` (`key, name, site, type, official, iso_639_1, published_at`) — the video DTO backing trailers
-- `PersonDetailResponse` (name, known_for_department, birthday, deathday, profile_path, movie_credits: `PersonMovieCreditsResponse{crew[], cast[]}`)
-- Crew/cast item DTOs: `id, name, job, character, order, department, release_date, title`
-- DTOs tolerate missing fields (`@JsonIgnoreProperties(ignoreUnknown = true)`) — TMDB adds fields; the adapter must not break on unknown keys.
-
-## Mapping (`TmdbMapper`) — DTO → domain
-
-All TMDB knowledge ends here:
-
-- `poster_path` → absolute URL (or null).
-- `release_date` "1957-10-25" → domain `LocalDate` / display year; unparsable or missing → null (UI omits).
-- `vote_average` → double, rounded for display in view models only.
-- `genre[]` → `List<String>` names (genre IDs are dropped — MVP needs names only).
-- Movie `credits.crew` where `job == "Director"` → directors; where `department == "Writing"` (job shown: Screenplay/Writer/Story) → writers.
-- Movie `credits.cast` ordered by `order` → principal cast (top 8).
-- Person `movie_credits.crew` where `department == "Directing"` → directing filmography (job "Director"); `department == "Writing"` → writing filmography; `movie_credits.cast` → acting filmography (character).
-- Person detail `known_for_department` → `Department` enum (Directing/Acting/Writing/Other).
-- Search result mapping: movie search items → `SearchResult` (type `MOVIE`, id, title, subtitle = vote average formatted "8.2" — search responses carry no genre names, year from release_date, thumbUrl from poster_path); person search items → `SearchResult` (type `PERSON`, name, subtitle = known-for department display name, thumbUrl from profile_path). TMDB relevance order preserved.
-- `videos.results` → `List<MovieVideo>` (key, name, type, official, language, publishedAt): **YouTube-only** (`site == "YouTube"`, case-insensitive; Vimeo/other sites are dropped), `official` null → false, `iso_639_1` → `language`. Hero-pick ranking lives in the view model, not here — the adapter maps everything it is given.
-
-Mapping is pure functions with no HTTP/IO — trivially unit-testable (the core test target in `testing.md`).
-
-## TMDB failure containment
-
-- Search: the single movie/person search call failing → the request fails with a friendly 503; no partial-result machinery needed.
-- Detail pages: any failure → 503 friendly page; TMDB's error body never rendered or logged verbatim in full.
-- Timeouts enforced at the HTTP layer; total request wall-time bounded by connect + request timeouts.
-
-## Uncertainty rule
-
-When an endpoint or response shape is uncertain, consult current TMDB API documentation rather than guessing. Keep API-specific assumptions (field spellings, `append_to_response`, image path conventions) **inside the adapter** — if TMDB changes, only `tmdb/` changes.
+- Jackson DTOs, `@JsonIgnoreProperties(ignoreUnknown = true)` — TMDB adds fields; the
+  adapter must not break.
+- All TMDB knowledge ends in `TmdbMapper` (pure functions, no IO — the core unit-test
+  target): date parsing (`"1957-10-25"` → `LocalDate`, unparsable → null), crew filters
+  (`job == "Director"` → directors, `department == "Writing"` → writers, cast by `order`
+  top 8), `known_for_department` → `Department`, filmography by crew department + cast,
+  videos filtered to YouTube-only (`official` null → false).
+- Search results: movie items → title, year, rating subtitle; person items → name,
+  known-for subtitle. TMDB relevance order preserved.

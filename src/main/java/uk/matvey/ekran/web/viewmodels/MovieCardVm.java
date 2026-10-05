@@ -34,7 +34,7 @@ public record MovieCardVm(
         return new MovieCardVm(
             item.movieTmdbId(),
             item.title(),
-            item.year(),
+            item.releaseDate() == null ? null : item.releaseDate().getYear(),
             null,
             null,
             null,

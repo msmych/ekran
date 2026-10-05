@@ -6,7 +6,7 @@
         <input type="search"
                id="search-input"
                name="q"
-               th:placeholder="${live and personSearch} ? 'Search people…' : 'Search movies…'"
+               th:placeholder="${personSearch} ? 'Search people…' : 'Search movies…'"
                th:value="${q}"
                autocomplete="off"
                spellcheck="false"
@@ -14,18 +14,17 @@
                hx-trigger="input changed delay:100ms, search"
                hx-sync="this: replace"
                hx-indicator="#search-indicator"
-               th:attr="hx-target=${live} ? '#results' : '#search-overlay',
-                        hx-include=${live} ? '#search-type',
+               hx-include="#search-type"
+               th:attr="hx-target=${live} ? '#results' : '#overlay-results',
                         autofocus=${live} ? 'autofocus' : null">
         <span id="search-indicator" class="search-indicator" aria-hidden="true"></span>
         <!-- `/` tip only on the compact overlay search — the home input is
              already focused and prominent, there is nothing to advertise;
              Cmd/Ctrl+K focuses it too, but `/` is the advertised shortcut -->
         <span class="search-kbd" id="search-kbd" aria-hidden="true" th:if="${!live}">/</span>
-        <!-- movies/people toggle: search.js flips the hidden input's value, re-applies the
-             active state and re-fires the search through the input's `search` trigger -->
+        <!-- movies/people toggle: search.js flips this value and re-fires the
+             input's `search` trigger; person pages default to people -->
         <input type="hidden" id="search-type" name="type"
-               th:if="${live}"
                th:value="${personSearch} ? 'person' : ''">
         <div class="search-toggle" th:if="${live}">
             <button type="button" data-search-type=""
@@ -33,7 +32,17 @@
             <button type="button" data-search-type="person"
                     th:classappend="${personSearch} ? 'active'">People</button>
         </div>
-        <div id="search-overlay" class="search-overlay" th:if="${!live}"></div>
+        <div id="search-overlay" class="search-overlay" th:if="${!live}">
+            <!-- the toggle rides at the top of the panel, outside the swapped
+                 #overlay-results so htmx never wipes it -->
+            <div class="search-toggle">
+                <button type="button" data-search-type=""
+                        th:classappend="${!personSearch} ? 'active'">Movies</button>
+                <button type="button" data-search-type="person"
+                        th:classappend="${personSearch} ? 'active'">People</button>
+            </div>
+            <div id="overlay-results"></div>
+        </div>
     </div>
 </th:block>
 </body>

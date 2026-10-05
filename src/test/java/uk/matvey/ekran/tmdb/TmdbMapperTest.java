@@ -223,14 +223,36 @@ class TmdbMapperTest {
         assertThat(person.died()).isNull();
         assertThat(person.profileUrl()).hasToString("https://image.tmdb.org/t/p/h632/r.jpg");
         assertThat(person.filmography().directing())
-            .extracting(f -> f.title() + ":" + f.year())
-            .containsExactly("Alien: Covenant:2017", "Blade Runner:1982", "Alien:1979");
+            .extracting(f -> f.title() + ":" + f.releaseDate())
+            .containsExactly("Alien: Covenant:2017-05-19", "Blade Runner:1982-06-25", "Alien:1979-05-25");
         assertThat(person.filmography().writing())
-            .extracting(f -> f.title() + ":" + f.year())
+            .extracting(f -> f.title() + ":" + f.releaseDate())
             .containsExactly("Untitled:null");
         assertThat(person.filmography().acting())
-            .extracting(f -> f.title() + ":" + f.year())
-            .containsExactly("Some Cameo:1990");
+            .extracting(f -> f.title() + ":" + f.releaseDate())
+            .containsExactly("Some Cameo:1990-01-01");
+    }
+
+    @Test
+    void filmographyOrdersSameYearMoviesByReleaseDate() throws Exception {
+        var response = objectMapper.readValue("""
+            {
+              "id": 1, "name": "Busy Director", "known_for_department": "Directing",
+              "movie_credits": {
+                "crew": [
+                  {"id": 2, "title": "Late Release", "job": "Director", "department": "Directing", "release_date": "2019-11-01"},
+                  {"id": 1, "title": "Early Release", "job": "Director", "department": "Directing", "release_date": "2019-02-14"},
+                  {"id": 3, "title": "Undated", "job": "Director", "department": "Directing", "release_date": ""}
+                ]
+              }
+            }
+            """, PersonDetailResponse.class);
+
+        var directing = mapper.toPerson(response).filmography().directing();
+
+        assertThat(directing)
+            .extracting(f -> f.title() + ":" + f.releaseDate())
+            .containsExactly("Late Release:2019-11-01", "Early Release:2019-02-14", "Undated:null");
     }
 
     @Test
