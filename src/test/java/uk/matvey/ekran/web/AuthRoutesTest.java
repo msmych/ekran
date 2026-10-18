@@ -747,6 +747,8 @@ void playlistEndpointsRejectAnonymous() {
             assertThat(bulkBody).contains("Add 2 movies to…");
             assertThat(bulkBody).contains("hx-post=\"/playlists/" + playlistId + "/movies\"");
             assertThat(bulkBody).doesNotContain("clearMarked");
+            assertThat(bulkBody.split("hx-include=\\\"#playlist-select-body \\.dialog-movies\\\"", -1).length - 1).isEqualTo(2);
+            assertThat(bulkBody).doesNotContain("hx-include=\"closest");
 
             // creating from the movie-page dialog keeps the dialog open with the new state
             var dialogCreate = http.request("/playlists", r -> {
@@ -834,15 +836,12 @@ void playlistEndpointsRejectAnonymous() {
                 r.post(new FormBody.Builder().add("note", "diner scene is perfect").build());
             });
 
-            // the marked page's dialog: bulk move mode, the movie set and the
-            // move flag riding along on every action; the create form must
-            // include the movie set (regression: a bare `closest` pointed at a
-            // sibling and created an empty playlist)
             var select = http.get("/playlists/select?movie=238&movie=680&move=true",
                 r -> r.header("Cookie", cookie(sessionId))).body().string();
             assertThat(select).contains("Move 2 movies to…");
             assertThat(select).contains("name=\"move\"");
-            assertThat(select).contains("hx-include=\"closest .playlist-select find .dialog-movies\"");
+            assertThat(select).doesNotContain("hx-include=\"closest");
+            assertThat(select).contains("hx-include=\"#playlist-select-body .dialog-movies\"");
 
             var create = http.request("/playlists", r -> {
                 r.header("Cookie", cookie(sessionId));

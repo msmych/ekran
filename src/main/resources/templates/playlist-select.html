@@ -37,7 +37,7 @@
             <th:block th:if="${movieId == null}">
                 <button type="button" class="pick"
                         th:attr="hx-post='/playlists/' + ${m.id} + '/movies'"
-                        hx-include="closest .playlist-select find .dialog-movies"
+                        hx-include="#playlist-select-body .dialog-movies"
                         hx-target="#playlist-select-body"
                         hx-swap="innerHTML">
                     <span class="pick-name" th:text="${m.name}">Favorites</span>
@@ -54,11 +54,14 @@
             No playlists yet — create the first one below.
         </li>
     </ul>
-    <!-- hx-include on the bulk pick buttons and the create form pulls exactly
-         these hidden inputs — the movie set and the move flag — while the
-         name/description fields of the create form never ride along with a
-         pick, and a pick button's own playlist id never rides along with a
-         create -->
+<!-- hx-include on the bulk pick buttons and the create form pulls exactly
+          these hidden inputs — the movie set and the move flag — while the
+          name/description fields of the create form never ride along with a
+          pick, and a pick button's own playlist id never rides along with a
+          create. The selector is document-scoped (#playlist-select-body, the
+          single dialog body each page embeds): htmx's extended selectors do
+          NOT chain, so "closest … find …" silently matched nothing and the
+          movie set never reached the server — playlists were created empty -->
     <div class="dialog-movies" hidden>
         <input type="hidden" name="movie" th:each="id : ${movieIds}" th:value="${id}">
         <!-- move-all (marked page): memberships take the movies, the marks go -->
@@ -70,7 +73,7 @@
         <button type="button" class="chip-button" data-new-playlist>New playlist</button>
     </div>
     <form class="pick-new" data-new-playlist-form hidden hx-post="/playlists"
-          hx-include="closest .playlist-select find .dialog-movies"
+          hx-include="#playlist-select-body .dialog-movies"
           hx-target="#playlist-select-body" hx-swap="innerHTML">
         <input type="text" name="name" maxlength="60" placeholder="New playlist name" required>
         <input type="text" name="description" maxlength="1000" placeholder="Description (optional)">
