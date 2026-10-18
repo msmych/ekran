@@ -7,7 +7,11 @@
     <div th:replace="~{header :: header(false)}"></div>
     <article class="person">
         <header class="person-head">
-            <img class="profile" th:if="${vm.profileUrl() != null}" th:src="${vm.profileUrl()}" alt="">
+            <th:block th:if="${vm.profileUrl() != null}">
+                <button type="button" class="profile-button" data-dialog="profile" aria-label="View full profile picture">
+                    <img class="profile" th:src="${vm.profileUrl()}" alt="">
+                </button>
+            </th:block>
             <div>
                 <h2 th:text="${vm.name()}">Name</h2>
                 <p class="known-for" th:if="${vm.knownFor() != null}" th:text="'Known for ' + ${vm.knownFor()}">Known for Directing</p>
@@ -33,6 +37,13 @@
                 </th:block>
             </ul>
         </section>
+        <dialog id="profile" aria-labelledby="profile-dialog-title" th:if="${vm.profileUrl() != null}">
+            <div class="dialog-head">
+                <h2 id="profile-dialog-title" th:text="${vm.name()}">Name</h2>
+                <button type="button" class="dialog-close" data-dialog-close aria-label="Close">✕</button>
+            </div>
+            <img class="profile-full" th:src="${vm.fullProfileUrl()}" th:alt="${vm.name()}">
+        </dialog>
     </article>
 </main>
 <footer th:replace="~{footer :: footer}"></footer>

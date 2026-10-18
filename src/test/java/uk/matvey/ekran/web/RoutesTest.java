@@ -69,7 +69,7 @@ class RoutesTest {
     private static final Person RIDLEY_SCOTT = new Person(
         1, "Ridley Scott", Department.DIRECTING,
         LocalDate.parse("1937-11-30"), null,
-        URI.create("https://img/profile.jpg"),
+        URI.create("https://img/t/p/h632/profile.jpg"),
         new Filmography(
             List.of(new FilmographyItem(348, "Alien", LocalDate.parse("1979-05-25"), URI.create("https://img/alien-card.jpg"))),
             List.of(),
@@ -400,6 +400,15 @@ class RoutesTest {
             assertThat(http.get("/").header("Cache-Control")).isEqualTo("no-cache");
             assertThat(http.get("/movies/348").header("Cache-Control")).isEqualTo("no-cache");
             assertThat(http.get("/js/search.js").header("Cache-Control")).isEqualTo("no-cache");
+        });
+    }
+
+    @Test
+    void responsesDeclareUtf8Charset() {
+        JavalinTest.test(app(), (server, http) -> {
+            assertThat(http.get("/movies/348").header("Content-Type")).contains("charset=utf-8");
+            assertThat(http.get("/search?q=alien", request ->
+                request.header("HX-Request", "true")).header("Content-Type")).contains("charset=utf-8");
         });
     }
 
@@ -806,6 +815,11 @@ class RoutesTest {
             assertThat(body).contains("Ridley Scott");
             assertThat(body).contains("Known for Directing");
             assertThat(body).contains("Born November 30, 1937");
+            assertThat(body).contains("class=\"profile-button\"");
+            assertThat(body).contains("data-dialog=\"profile\"");
+            assertThat(body).contains("<dialog id=\"profile\"");
+            assertThat(body).contains("src=\"https://img/t/p/h632/profile.jpg\"");
+            assertThat(body).contains("src=\"https://img/t/p/original/profile.jpg\"");
             assertThat(body).contains("href=\"/persons/1/directing\"");
             assertThat(body).contains("href=\"/persons/1/acting\"");
             assertThat(body).contains("href=\"/persons/1/writing\"");
@@ -838,6 +852,8 @@ assertThat(body).contains("href=\"/movies/348\"");
             var body = http.get("/persons/7").body().string();
 
             assertThat(body).contains("August 28, 1925 – September 27, 2003");
+            assertThat(body).doesNotContain("data-dialog=\"profile\"");
+            assertThat(body).doesNotContain("<dialog");
         });
     }
 

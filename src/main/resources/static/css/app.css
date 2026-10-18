@@ -549,8 +549,9 @@ body {
     flex: none;
 }
 
-/* the small poster opens its full-size version in a dialog */
-.poster-button {
+/* the small poster/profile opens its full-size version in a dialog */
+.poster-button,
+.profile-button {
     padding: 0;
     border: none;
     background: none;
@@ -558,7 +559,8 @@ body {
     cursor: zoom-in;
 }
 
-.poster-button .poster {
+.poster-button .poster,
+.profile-button .profile {
     display: block;
 }
 
@@ -720,12 +722,14 @@ dialog::backdrop {
     background: rgba(0, 0, 0, 0.5);
 }
 
-/* the full poster wants no 720px dialog chrome — the image sizes it */
-#poster {
+/* the full poster/profile picture wants no 720px dialog chrome — the image sizes it */
+#poster,
+#profile {
     width: min(480px, calc(100% - 32px));
 }
 
-#poster .poster-full {
+#poster .poster-full,
+#profile .profile-full {
     display: block;
     width: 100%;
     max-height: calc(100vh - 120px);

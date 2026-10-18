@@ -61,7 +61,8 @@ carries the movie/person distinction.
   or an empty section falls back to the all view at `/all`. Tabs: `Directing | Acting |
   Writing | All`, current one marked; unknown department → 404.
 - Header: name, "Known for X", life dates ("Born November 30, 1937" / en-dash range),
-  TMDB link. No biography — deliberately dropped.
+  TMDB link. Profile picture (h632) opens the original-size version in a `<dialog>`,
+  like the movie poster. No biography — deliberately dropped.
 - Filmography: shared movie-card grid per department, sorted by release date desc
   (undated last), no role line, no duration (see `data-model.md`). Every title links to
   `/movies/{id}`.

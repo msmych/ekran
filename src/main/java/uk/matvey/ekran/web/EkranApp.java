@@ -5,6 +5,7 @@ import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.rendering.FileRenderer;
 import io.javalin.rendering.template.JavalinThymeleaf;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -66,10 +67,8 @@ public final class EkranApp {
                 // request URI only, never the query string — it would log raw magic-link tokens
                 log.info("{} {} -> {} ({} ms)", ctx.method(), ctx.req().getRequestURI(), ctx.status(), ms == null ? "-" : Math.round(ms)));
         });
-        // explicit revalidation everywhere: without it browsers heuristically cache
-        // pages and assets (Safari pairs max-age=0 with the fake 1980 Last-Modified
-        // and serves stale JS after deploys — mismatched markup/JS versions follow)
         app.before(ctx -> ctx.header("Cache-Control", "no-cache"));
+        app.before(ctx -> ctx.res().setCharacterEncoding(StandardCharsets.UTF_8.name()));
         app.before(ctx -> resolveCurrentUser(ctx, authService, marksService, notesService, playlistsService));
         new SearchRoutes(searchService).register(app);
         new MovieRoutes(movieService, playlistsService, marksService, notesService).register(app);

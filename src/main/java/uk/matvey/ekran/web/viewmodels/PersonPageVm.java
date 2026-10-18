@@ -1,5 +1,6 @@
 package uk.matvey.ekran.web.viewmodels;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.List;
@@ -14,6 +15,7 @@ public record PersonPageVm(
     String knownFor,
     String lifeDates,
     String profileUrl,
+    String fullProfileUrl,
     List<DepartmentTabVm> departments,
     List<FilmographySectionVm> sections,
     String currentDepartment,
@@ -28,6 +30,7 @@ public record PersonPageVm(
             person.knownFor() == Department.OTHER ? null : person.knownFor().displayName(),
             lifeDates(person.born(), person.died()),
             person.profileUrl() == null ? null : person.profileUrl().toString(),
+            fullProfileUrl(person.profileUrl()),
             List.of(
                 new DepartmentTabVm(Department.DIRECTING),
                 new DepartmentTabVm(Department.ACTING),
@@ -72,6 +75,10 @@ public record PersonPageVm(
 
     private static String fullDate(LocalDate date) {
         return date.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + date.getDayOfMonth() + ", " + date.getYear();
+    }
+
+    private static String fullProfileUrl(URI profileUrl) {
+        return profileUrl == null ? null : profileUrl.toString().replace("/h632/", "/original/");
     }
 
     public record DepartmentTabVm(
